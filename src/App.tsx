@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, Upload, Clock as ClockIcon, Book, History, Terminal, Puzzle, Move, RotateCcw, MonitorPlay, Eye, EyeOff, Scaling, Cloud, Quote as QuoteIcon, Calendar } from 'lucide-react';
+import { Settings, Upload, Clock as ClockIcon, Book, History, Terminal, Puzzle, Move, RotateCcw, MonitorPlay, Eye, EyeOff, Scaling, Cloud, Quote as QuoteIcon, Calendar, Plus, Grid, Info, Home } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { Background } from './components/Background';
 import { Clock, DateWidget } from './components/Clock';
@@ -8,13 +8,28 @@ import { Bookmarks } from './components/Bookmarks';
 import { HistoryViewer } from './components/HistoryViewer';
 import { DevTools } from './components/DevTools';
 import { MediaPlayer } from './components/MediaPlayer';
+import { AboutPage } from './components/AboutPage';
 import { ExtensionsViewer } from './components/ExtensionsViewer';
 import { Weather } from './components/Weather';
 import { Quote } from './components/Quote';
+import { TodoList } from './components/TodoList';
+import { Memo } from './components/Memo';
+import { CalendarWidget } from './components/CalendarWidget';
+import { Pomodoro } from './components/Pomodoro';
+import { Tiles, SingleTile, TileEditor } from './components/Tiles';
+import { PhotoGridGenerator } from './components/PhotoGridGenerator';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { saveVideoToDB, clearVideoFromDB, saveImageToDB, getImageFromDB, getVideoFromDB, clearImageFromDB } from './lib/db';
 
-type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions';
+type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions' | 'about';
+
+// Alignment detection threshold in pixels
+const SNAP_THRESHOLD = 8;
+
+interface AlignmentGuide {
+    type: 'vertical' | 'horizontal';
+    position: number; // screen position
+}
 
 // Helper for resizing and dragging
 const ResizableDraggable = ({ 
@@ -26,7 +41,9 @@ const ResizableDraggable = ({
     h, 
     onUpdate, 
     isEditing,
-    visible 
+    visible,
+    onDragState,
+    allBounds
 }: { 
     id: string; 
     children: React.ReactNode; 
@@ -37,6 +54,8 @@ const ResizableDraggable = ({
     onUpdate: (id: string, updates: { x?: number, y?: number, w?: number, h?: number }) => void;
     isEditing: boolean;
     visible: boolean;
+    onDragState?: (id: string, bounds: { x: number, y: number, w: number, h: number } | null) => void;
+    allBounds?: Record<string, { x: number, y: number, w: number, h: number }>;
 }) => {
     const [pos, setPos] = useState({ x, y });
     const [size, setSize] = useState({ w, h });
@@ -76,17 +95,58 @@ const ResizableDraggable = ({
             if (isDragging) {
                 const dx = e.clientX - startPos.current.x;
                 const dy = e.clientY - startPos.current.y;
-                setPos({
-                    x: initialDragPos.current.x + dx,
-                    y: initialDragPos.current.y + dy
-                });
+                let newX = initialDragPos.current.x + dx;
+                let newY = initialDragPos.current.y + dy;
+                
+                // Snap to other elements
+                if (allBounds) {
+                    const screenCenterX = window.innerWidth / 2;
+                    const screenCenterY = window.innerHeight / 2;
+                    const myLeft = screenCenterX + newX;
+                    const myRight = myLeft + size.w;
+                    const myCenterX = myLeft + size.w / 2;
+                    const myTop = screenCenterY + newY;
+                    const myBottom = myTop + size.h;
+                    const myCenterY = myTop + size.h / 2;
+                    
+                    Object.entries(allBounds).forEach(([otherId, other]) => {
+                        if (otherId === id) return;
+                        const otherLeft = screenCenterX + other.x;
+                        const otherRight = otherLeft + other.w;
+                        const otherCenterX = otherLeft + other.w / 2;
+                        const otherTop = screenCenterY + other.y;
+                        const otherBottom = otherTop + other.h;
+                        const otherCenterY = otherTop + other.h / 2;
+                        
+                        // Snap X
+                        if (Math.abs(myLeft - otherLeft) < SNAP_THRESHOLD) newX = other.x;
+                        else if (Math.abs(myRight - otherRight) < SNAP_THRESHOLD) newX = other.x + other.w - size.w;
+                        else if (Math.abs(myLeft - otherRight) < SNAP_THRESHOLD) newX = other.x + other.w;
+                        else if (Math.abs(myRight - otherLeft) < SNAP_THRESHOLD) newX = other.x - size.w;
+                        else if (Math.abs(myCenterX - otherCenterX) < SNAP_THRESHOLD) newX = other.x + (other.w - size.w) / 2;
+                        
+                        // Snap Y
+                        if (Math.abs(myTop - otherTop) < SNAP_THRESHOLD) newY = other.y;
+                        else if (Math.abs(myBottom - otherBottom) < SNAP_THRESHOLD) newY = other.y + other.h - size.h;
+                        else if (Math.abs(myTop - otherBottom) < SNAP_THRESHOLD) newY = other.y + other.h;
+                        else if (Math.abs(myBottom - otherTop) < SNAP_THRESHOLD) newY = other.y - size.h;
+                        else if (Math.abs(myCenterY - otherCenterY) < SNAP_THRESHOLD) newY = other.y + (other.h - size.h) / 2;
+                    });
+                    
+                    // Snap to screen center
+                    if (Math.abs(myCenterX - screenCenterX) < SNAP_THRESHOLD) newX = -size.w / 2;
+                    if (Math.abs(myCenterY - screenCenterY) < SNAP_THRESHOLD) newY = -size.h / 2;
+                }
+                
+                setPos({ x: newX, y: newY });
+                onDragState?.(id, { x: newX, y: newY, w: size.w, h: size.h });
             } else if (isResizing) {
                 const dx = e.clientX - startPos.current.x;
                 const dy = e.clientY - startPos.current.y;
-                setSize({
-                    w: Math.max(100, initialSize.current.w + dx),
-                    h: Math.max(50, initialSize.current.h + dy)
-                });
+                const newW = Math.max(100, initialSize.current.w + dx);
+                const newH = Math.max(50, initialSize.current.h + dy);
+                setSize({ w: newW, h: newH });
+                onDragState?.(id, { x: pos.x, y: pos.y, w: newW, h: newH });
             }
         };
 
@@ -94,10 +154,12 @@ const ResizableDraggable = ({
             if (isDragging) {
                 setIsDragging(false);
                 onUpdate(id, { x: pos.x, y: pos.y });
+                onDragState?.(id, null);
             }
             if (isResizing) {
                 setIsResizing(false);
                 onUpdate(id, { w: size.w, h: size.h });
+                onDragState?.(id, null);
             }
         };
 
@@ -121,12 +183,12 @@ const ResizableDraggable = ({
                 width: size.w,
                 height: size.h
             }}
-            className={`absolute transition-transform duration-75 ${isEditing ? 'cursor-move ring-2 ring-blue-500/50 rounded-xl bg-black/20 backdrop-blur-sm' : ''}`}
+            className={`absolute transition-transform duration-75 ${isEditing ? 'cursor-move ring-1 ring-white/20 rounded-xl bg-white/5 backdrop-blur-sm' : ''}`}
             onMouseDown={handleMouseDown}
         >
             {isEditing && (
                 <>
-                    <div className="absolute -top-3 -right-3 bg-blue-500 text-white p-1 rounded-full shadow-sm z-50 pointer-events-none">
+                    <div className="absolute -top-3 -right-3 bg-white/20 backdrop-blur-md text-white p-1 rounded-full shadow-sm z-50 pointer-events-none ring-1 ring-white/10">
                         <Move size={12} />
                     </div>
                     {/* Resize Handle */}
@@ -165,7 +227,9 @@ function App() {
     updateLayout,
     resetLayout,
     exportLayout,
-    importLayout
+    importLayout,
+    tiles,
+    addTile
   } = useStore();
   
   // ... existing state ...
@@ -178,6 +242,77 @@ function App() {
   const [importCode, setImportCode] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isTileEditorOpen, setIsTileEditorOpen] = useState(false);
+  const [isPhotoGridOpen, setIsPhotoGridOpen] = useState(false);
+
+  // Drag state for alignment guides
+  const [dragBounds, setDragBounds] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
+
+  // Get all element bounds for snapping
+  const getAllBounds = useCallback(() => {
+    const bounds: Record<string, { x: number, y: number, w: number, h: number }> = {};
+    Object.entries(layout).forEach(([key, item]) => {
+      if (item.visible) {
+        bounds[key] = { x: item.x, y: item.y, w: item.w, h: item.h };
+      }
+    });
+    return bounds;
+  }, [layout]);
+
+  // Handle drag state updates and calculate alignment guides
+  const handleDragState = useCallback((id: string, bounds: { x: number, y: number, w: number, h: number } | null) => {
+    setDragBounds(bounds);
+    if (!bounds) {
+      setAlignmentGuides([]);
+      return;
+    }
+
+    const guides: AlignmentGuide[] = [];
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    const myLeft = screenCenterX + bounds.x;
+    const myRight = myLeft + bounds.w;
+    const myCenterX = myLeft + bounds.w / 2;
+    const myTop = screenCenterY + bounds.y;
+    const myBottom = myTop + bounds.h;
+    const myCenterY = myTop + bounds.h / 2;
+
+    // Check screen center alignment
+    if (Math.abs(myCenterX - screenCenterX) < SNAP_THRESHOLD) {
+      guides.push({ type: 'vertical', position: screenCenterX });
+    }
+    if (Math.abs(myCenterY - screenCenterY) < SNAP_THRESHOLD) {
+      guides.push({ type: 'horizontal', position: screenCenterY });
+    }
+
+    // Check alignment with other elements
+    Object.entries(layout).forEach(([otherId, other]) => {
+      if (otherId === id || !other.visible) return;
+      const otherLeft = screenCenterX + other.x;
+      const otherRight = otherLeft + other.w;
+      const otherCenterX = otherLeft + other.w / 2;
+      const otherTop = screenCenterY + other.y;
+      const otherBottom = otherTop + other.h;
+      const otherCenterY = otherTop + other.h / 2;
+
+      // Vertical guides (X alignment)
+      if (Math.abs(myLeft - otherLeft) < SNAP_THRESHOLD) guides.push({ type: 'vertical', position: otherLeft });
+      if (Math.abs(myRight - otherRight) < SNAP_THRESHOLD) guides.push({ type: 'vertical', position: otherRight });
+      if (Math.abs(myLeft - otherRight) < SNAP_THRESHOLD) guides.push({ type: 'vertical', position: otherRight });
+      if (Math.abs(myRight - otherLeft) < SNAP_THRESHOLD) guides.push({ type: 'vertical', position: otherLeft });
+      if (Math.abs(myCenterX - otherCenterX) < SNAP_THRESHOLD) guides.push({ type: 'vertical', position: otherCenterX });
+
+      // Horizontal guides (Y alignment)
+      if (Math.abs(myTop - otherTop) < SNAP_THRESHOLD) guides.push({ type: 'horizontal', position: otherTop });
+      if (Math.abs(myBottom - otherBottom) < SNAP_THRESHOLD) guides.push({ type: 'horizontal', position: otherBottom });
+      if (Math.abs(myTop - otherBottom) < SNAP_THRESHOLD) guides.push({ type: 'horizontal', position: otherBottom });
+      if (Math.abs(myBottom - otherTop) < SNAP_THRESHOLD) guides.push({ type: 'horizontal', position: otherTop });
+      if (Math.abs(myCenterY - otherCenterY) < SNAP_THRESHOLD) guides.push({ type: 'horizontal', position: otherCenterY });
+    });
+
+    setAlignmentGuides(guides);
+  }, [layout]);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{x: number, y: number} | null>(null);
@@ -312,12 +447,41 @@ function App() {
       
       {/* Edit Mode Overlay/Hint */}
       {isEditingLayout && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg z-[100] flex items-center gap-2 animate-bounce-in">
-              <span>布局编辑模式</span>
-              <div className="h-4 w-px bg-white/30"></div>
-              <button onClick={resetLayout} className="hover:text-blue-200" title="重置布局"><RotateCcw size={16}/></button>
-              <button onClick={() => setIsEditingLayout(false)} className="hover:text-blue-200 font-bold ml-2">完成</button>
-          </div>
+          <>
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg z-[100] flex items-center gap-2 animate-bounce-in">
+                  <span>布局编辑模式</span>
+                  <div className="h-4 w-px bg-white/30"></div>
+                  <button onClick={resetLayout} className="hover:text-blue-200" title="重置布局"><RotateCcw size={16}/></button>
+                  <button onClick={() => setIsEditingLayout(false)} className="hover:text-blue-200 font-bold ml-2">完成</button>
+              </div>
+              
+              {/* Dynamic Alignment Guide Lines */}
+              <div className="absolute inset-0 pointer-events-none z-[90]">
+                  {alignmentGuides.map((guide, i) => (
+                      guide.type === 'vertical' ? (
+                          <div 
+                              key={`v-${i}`}
+                              className="absolute top-0 bottom-0 w-px bg-magenta-500"
+                              style={{ 
+                                  left: guide.position, 
+                                  background: 'linear-gradient(to bottom, transparent, #f0f, transparent)',
+                                  boxShadow: '0 0 8px #f0f'
+                              }} 
+                          />
+                      ) : (
+                          <div 
+                              key={`h-${i}`}
+                              className="absolute left-0 right-0 h-px"
+                              style={{ 
+                                  top: guide.position,
+                                  background: 'linear-gradient(to right, transparent, #f0f, transparent)',
+                                  boxShadow: '0 0 8px #f0f'
+                              }} 
+                          />
+                      )
+                  ))}
+              </div>
+          </>
       )}
 
       {/* Top Navigation Bar */}
@@ -330,7 +494,7 @@ function App() {
                     className={`p-2 rounded-full transition-all ${viewMode === 'home' ? 'bg-white text-black shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
                     title="主页"
                   >
-                      <ClockIcon size={20} />
+                      <Home size={20} />
                   </button>
                   <button 
                     onClick={() => setViewMode('bookmarks')}
@@ -359,6 +523,13 @@ function App() {
                     title="扩展程序管理"
                   >
                       <Puzzle size={20} />
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('about')}
+                    className={`p-2 rounded-full transition-all ${viewMode === 'about' ? 'bg-white text-black shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+                    title="关于"
+                  >
+                      <Info size={20} />
                   </button>
               </div>
           </div>
@@ -391,11 +562,15 @@ function App() {
             {Object.entries({
                 clock: '时钟',
                 date: '日期',
+                calendar: '日历',
                 search: '搜索栏',
                 shortcuts: '收藏夹',
                 mediaPlayer: '媒体播放器',
                 weather: '天气',
-                quote: '每日一言'
+                quote: '每日一言',
+                todo: '待办事项',
+                memo: '便签',
+                pomodoro: '番茄钟'
             }).map(([key, label]) => (
                 <button
                     key={key}
@@ -409,6 +584,23 @@ function App() {
                     <span className={layout[key]?.visible ? 'text-white' : 'text-zinc-500'}>{label}</span>
                 </button>
             ))}
+
+            <div className="border-t border-white/5 my-1" />
+
+            <button 
+                onClick={() => { setIsTileEditorOpen(true); setContextMenu(null); }}
+                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+            >
+                <Plus size={14} />
+                添加独立磁贴
+            </button>
+            <button 
+                onClick={() => { setIsPhotoGridOpen(true); setContextMenu(null); }}
+                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+            >
+                <Grid size={14} />
+                添加图片拼图
+            </button>
 
             <div className="border-t border-white/5 my-1" />
 
@@ -445,6 +637,8 @@ function App() {
                     onUpdate={handleUpdate} 
                     isEditing={isEditingLayout}
                     visible={layout.clock.visible}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
                  >
                      <Clock />
                  </ResizableDraggable>
@@ -465,8 +659,32 @@ function App() {
                     isEditing={isEditingLayout}
                     // @ts-ignore
                     visible={layout.date?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
                  >
                      <DateWidget />
+                 </ResizableDraggable>
+
+                 {/* Calendar Widget */}
+                 {/* @ts-ignore */}
+                 <ResizableDraggable 
+                    id="calendar" 
+                    // @ts-ignore
+                    x={layout.calendar?.x || 400} 
+                    // @ts-ignore
+                    y={layout.calendar?.y || -100} 
+                    // @ts-ignore
+                    w={layout.calendar?.w || 360} 
+                    // @ts-ignore
+                    h={layout.calendar?.h || 340} 
+                    onUpdate={handleUpdate} 
+                    isEditing={isEditingLayout}
+                    // @ts-ignore
+                    visible={layout.calendar?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
+                 >
+                     <CalendarWidget />
                  </ResizableDraggable>
 
                  {/* Search */}
@@ -479,6 +697,8 @@ function App() {
                     onUpdate={handleUpdate} 
                     isEditing={isEditingLayout}
                     visible={layout.search.visible}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
                  >
                      <Search />
                  </ResizableDraggable>
@@ -493,6 +713,8 @@ function App() {
                     onUpdate={handleUpdate} 
                     isEditing={isEditingLayout}
                     visible={layout.shortcuts.visible}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
                  >
                      <Bookmarks />
                  </ResizableDraggable>
@@ -513,6 +735,8 @@ function App() {
                     isEditing={isEditingLayout}
                     // @ts-ignore
                     visible={layout.mediaPlayer?.visible ?? true}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
                  >
                      <MediaPlayer showPlaceholder={isEditingLayout} />
                  </ResizableDraggable>
@@ -533,6 +757,8 @@ function App() {
                     isEditing={isEditingLayout}
                     // @ts-ignore
                     visible={layout.weather?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
                  >
                      <Weather />
                  </ResizableDraggable>
@@ -553,11 +779,168 @@ function App() {
                     isEditing={isEditingLayout}
                     // @ts-ignore
                     visible={layout.quote?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
                  >
                      <Quote />
                  </ResizableDraggable>
+
+                 {/* Todo List Widget */}
+                 {/* @ts-ignore */}
+                 <ResizableDraggable 
+                    id="todo" 
+                    // @ts-ignore
+                    x={layout.todo?.x || -400} 
+                    // @ts-ignore
+                    y={layout.todo?.y || 0} 
+                    // @ts-ignore
+                    w={layout.todo?.w || 300} 
+                    // @ts-ignore
+                    h={layout.todo?.h || 400} 
+                    onUpdate={handleUpdate} 
+                    isEditing={isEditingLayout}
+                    // @ts-ignore
+                    visible={layout.todo?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
+                 >
+                     <TodoList />
+                 </ResizableDraggable>
+
+                 {/* Memo Widget */}
+                 {/* @ts-ignore */}
+                 <ResizableDraggable 
+                    id="memo" 
+                    // @ts-ignore
+                    x={layout.memo?.x || 400} 
+                    // @ts-ignore
+                    y={layout.memo?.y || 0} 
+                    // @ts-ignore
+                    w={layout.memo?.w || 300} 
+                    // @ts-ignore
+                    h={layout.memo?.h || 300} 
+                    onUpdate={handleUpdate} 
+                    isEditing={isEditingLayout}
+                    // @ts-ignore
+                    visible={layout.memo?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
+                 >
+                     <Memo />
+                 </ResizableDraggable>
+
+                 {/* Pomodoro Widget */}
+                 {/* @ts-ignore */}
+                 <ResizableDraggable 
+                    id="pomodoro" 
+                    // @ts-ignore
+                    x={layout.pomodoro?.x || 0} 
+                    // @ts-ignore
+                    y={layout.pomodoro?.y || 200} 
+                    // @ts-ignore
+                    w={layout.pomodoro?.w || 300} 
+                    // @ts-ignore
+                    h={layout.pomodoro?.h || 320} 
+                    onUpdate={handleUpdate} 
+                    isEditing={isEditingLayout}
+                    // @ts-ignore
+                    visible={layout.pomodoro?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
+                 >
+                     <Pomodoro />
+                 </ResizableDraggable>
+
+                 {/* Individual Tiles */}
+                 {tiles.map((tile) => {
+                     const layoutId = `tile_${tile.id}`;
+                     const tileLayout = layout[layoutId];
+                     
+                     // If no layout data exists yet (newly added), use defaults or don't render until updated
+                     if (!tileLayout) return null;
+
+                     return (
+                         <ResizableDraggable
+                            key={tile.id}
+                            id={layoutId}
+                            x={tileLayout.x}
+                            y={tileLayout.y}
+                            w={tileLayout.w}
+                            h={tileLayout.h}
+                            onUpdate={handleUpdate}
+                            isEditing={isEditingLayout}
+                            visible={tileLayout.visible}
+                            onDragState={handleDragState}
+                            allBounds={getAllBounds()}
+                         >
+                             <SingleTile tile={tile} isEditing={isEditingLayout} />
+                         </ResizableDraggable>
+                     );
+                 })}
              </div>
         </div>
+
+        {/* Tile Editor Modal (for adding new tiles via context menu) */}
+        <TileEditor 
+            isOpen={isTileEditorOpen} 
+            onClose={() => setIsTileEditorOpen(false)}
+            onSave={(tile) => {
+                addTile(tile);
+            }}
+        />
+
+        {/* Photo Grid Generator Modal */}
+        <PhotoGridGenerator
+            isOpen={isPhotoGridOpen}
+            onClose={() => setIsPhotoGridOpen(false)}
+            onSave={(newTiles, rows, cols) => {
+                // Add all tiles at once. 
+                // We should probably position them in a grid initially if possible, or just let them stack?
+                // The current addTile implementation stacks them at (0,0).
+                // Let's modify addTile to support batch add or just loop.
+                // But if we loop, they all go to 0,0.
+                // Better to manually position them here?
+                // The `addTile` function in store sets x:0, y:0.
+                // We can update their layout after adding.
+                
+                // However, `addTile` generates a new layout entry.
+                // We might want to enhance `useStore` to support `addTiles` (plural) with positions.
+                // Or just loop and update layout immediately.
+                
+                newTiles.forEach((tile, index) => {
+                    addTile(tile);
+                    // Calculate initial grid position
+                    // We need the ID generated/used.
+                    // The tile object passed to addTile already has an ID.
+                    
+                    const row = Math.floor(index / cols);
+                    const col = index % cols;
+                    
+                    // Delay slightly to ensure state update? 
+                    // Zustand is synchronous usually.
+                    // Let's update layout.
+                    // Default size is 100x100.
+                    // Let's position them side by side.
+                    const tileSize = 120; // slightly larger
+                    const startX = -((cols * tileSize) / 2) + (tileSize / 2);
+                    const startY = -((rows * tileSize) / 2) + (tileSize / 2);
+                    
+                    const x = startX + (col * tileSize);
+                    const y = startY + (row * tileSize);
+                    
+                    // We need to call updateLayout for this specific tile.
+                    // But `addTile` creates the layout entry with default 0,0.
+                    // We can override it.
+                    // setTimeout is not ideal but ensures the first set finished? 
+                    // No, Zustand batching might require it.
+                    // Actually, let's just use a timeout of 0.
+                    setTimeout(() => {
+                        // @ts-ignore
+                        updateLayout(`tile_${tile.id}`, { x, y, w: tileSize, h: tileSize });
+                    }, 0);
+                });
+            }}
+        />
 
         {/* Bookmarks View */}
         <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'bookmarks' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
@@ -594,6 +977,13 @@ function App() {
         <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'extensions' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
              <div className="w-full max-w-6xl h-full bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl overflow-hidden">
                  <ExtensionsViewer />
+             </div>
+        </div>
+
+        {/* About View */}
+        <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'about' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+             <div className="w-full max-w-4xl h-full bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl overflow-hidden">
+                 <AboutPage />
              </div>
         </div>
 

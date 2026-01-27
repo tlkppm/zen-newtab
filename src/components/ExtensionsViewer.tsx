@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Puzzle, Trash2, Power, PowerOff, ExternalLink } from 'lucide-react';
+import { Puzzle, Trash2, Power, PowerOff } from 'lucide-react';
 
 interface ExtensionInfo {
   id: string;
@@ -105,23 +105,29 @@ export const ExtensionsViewer = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col gap-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-white/80">
                 <Puzzle size={24} />
-                <h2 className="text-xl font-medium">已安装的扩展程序 ({extensions.length})</h2>
+                <h2 className="text-xl font-medium">扩展程序管理</h2>
             </div>
         </div>
 
+        <div className="h-px bg-white/5 w-full" />
+
+        <div className="flex items-center gap-2 text-white/80 mb-2">
+            <h3 className="text-lg font-medium">已安装的其他扩展 ({extensions.length})</h3>
+        </div>
+
         {/* List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0">
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-zinc-500">加载中...</div>
             ) : extensions.length === 0 ? (
                 <div className="text-center text-zinc-500 py-10">未检测到其他扩展程序</div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
                     {extensions.map(ext => {
                         const iconUrl = getIcon(ext);
                         return (

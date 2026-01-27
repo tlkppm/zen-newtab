@@ -7,6 +7,23 @@ interface Shortcut {
   url: string;
 }
 
+export interface Tile {
+  id: string;
+  title?: string;
+  url: string;
+  color: string;
+  icon: string;
+  bgType?: 'color' | 'image';
+  bgImage?: string; // id for DB lookup, or url
+  // New fields for grid/slice support
+  bgSlice?: {
+      x: number; // percentage 0-100
+      y: number; // percentage 0-100
+      zoomX: number; // percentage (e.g. 200 for 2 cols)
+      zoomY: number; // percentage (e.g. 200 for 2 rows)
+  };
+}
+
 export type BackgroundType = 'image' | 'video';
 export type SearchEngine = 'google' | 'bing' | 'baidu';
 
@@ -43,24 +60,38 @@ interface AppState {
   addShortcut: (shortcut: Shortcut) => void;
   removeShortcut: (id: string) => void;
 
+  tiles: Tile[];
+  addTile: (tile: Tile) => void;
+  removeTile: (id: string) => void;
+  updateTile: (id: string, updates: Partial<Tile>) => void;
+  setTiles: (tiles: Tile[]) => void;
+
   searchEngine: SearchEngine;
   setSearchEngine: (engine: SearchEngine) => void;
 
   // Layout State
-  layout: {
-      clock: LayoutItem;
-      search: LayoutItem;
-      shortcuts: LayoutItem; // Bookmarks
-      mediaPlayer: LayoutItem;
-      weather: LayoutItem;
-      quote: LayoutItem;
-      date: LayoutItem;
-  };
-  updateLayout: (id: keyof AppState['layout'], updates: Partial<LayoutItem>) => void;
+  // We use Record<string, LayoutItem> to support dynamic keys (like individual tiles)
+  layout: Record<string, LayoutItem>;
+  updateLayout: (id: string, updates: Partial<LayoutItem>) => void;
   resetLayout: () => void;
   exportLayout: () => string;
   importLayout: (code: string) => boolean;
 }
+
+const DEFAULT_LAYOUT = {
+    clock: { id: 'clock', x: 0, y: -80, w: 600, h: 200, visible: true },
+    search: { id: 'search', x: 0, y: 50, w: 500, h: 50, visible: true },
+    shortcuts: { id: 'shortcuts', x: 0, y: 200, w: 800, h: 400, visible: false },
+    mediaPlayer: { id: 'mediaPlayer', x: 300, y: 200, w: 300, h: 100, visible: false },
+    weather: { id: 'weather', x: 300, y: -200, w: 250, h: 120, visible: false },
+    quote: { id: 'quote', x: -300, y: 200, w: 300, h: 100, visible: false },
+    date: { id: 'date', x: 0, y: -20, w: 400, h: 50, visible: false },
+    calendar: { id: 'calendar', x: 400, y: -100, w: 360, h: 340, visible: false },
+    todo: { id: 'todo', x: -400, y: 0, w: 300, h: 400, visible: false },
+    memo: { id: 'memo', x: 400, y: 0, w: 300, h: 300, visible: false },
+    pomodoro: { id: 'pomodoro', x: 0, y: 200, w: 300, h: 320, visible: false },
+    about: { id: 'about', x: 0, y: 0, w: 400, h: 300, visible: false },
+};
 
 export const useStore = create<AppState>()(
   persist(
@@ -92,35 +123,70 @@ export const useStore = create<AppState>()(
       addShortcut: (shortcut) => set((state) => ({ shortcuts: [...state.shortcuts, shortcut] })),
       removeShortcut: (id) => set((state) => ({ shortcuts: state.shortcuts.filter((s) => s.id !== id) })),
 
+      tiles: [
+        // Default tiles
+      ],
+      addTile: (tile) => set((state) => {
+          // Add a new layout entry for this tile
+          const tileLayoutId = `tile_${tile.id}`;
+          return {
+              tiles: [...state.tiles, tile],
+              layout: {
+                  ...state.layout,
+                  [tileLayoutId]: { 
+                      id: tileLayoutId, 
+                      x: 0, 
+                      y: 0, 
+                      w: 100, 
+                      h: 100, 
+                      visible: true 
+                  }
+              }
+          };
+      }),
+      removeTile: (id) => set((state) => {
+          const newLayout = { ...state.layout };
+          delete newLayout[`tile_${id}`];
+          return { 
+              tiles: state.tiles.filter((t) => t.id !== id),
+              layout: newLayout
+          };
+      }),
+      updateTile: (id, updates) => set((state) => ({
+        tiles: state.tiles.map((t) => (t.id === id ? { ...t, ...updates } : t))
+      })),
+      setTiles: (tiles) => set({ tiles }),
+
       searchEngine: 'google' as SearchEngine,
       setSearchEngine: (engine) => set({ searchEngine: engine }),
 
-      // Default Layout
-      layout: {
-          clock: { id: 'clock', x: 0, y: -80, w: 600, h: 200, visible: true },
-          search: { id: 'search', x: 0, y: 50, w: 500, h: 50, visible: true },
-          shortcuts: { id: 'shortcuts', x: 0, y: 200, w: 800, h: 400, visible: false },
-          mediaPlayer: { id: 'mediaPlayer', x: 300, y: 200, w: 300, h: 100, visible: false },
-          weather: { id: 'weather', x: 300, y: -200, w: 250, h: 120, visible: false },
-          quote: { id: 'quote', x: -300, y: 200, w: 300, h: 100, visible: false },
-          date: { id: 'date', x: 0, y: -20, w: 400, h: 50, visible: false },
-      },
+      // Layout State
+      layout: DEFAULT_LAYOUT,
       updateLayout: (id, updates) => set((state) => ({
           layout: {
               ...state.layout,
               [id]: { ...state.layout[id], ...updates }
           }
       })),
-      resetLayout: () => set({
-          layout: {
-              clock: { id: 'clock', x: 0, y: -80, w: 600, h: 200, visible: true },
-              search: { id: 'search', x: 0, y: 50, w: 500, h: 50, visible: true },
-              shortcuts: { id: 'shortcuts', x: 0, y: 200, w: 800, h: 400, visible: false },
-              mediaPlayer: { id: 'mediaPlayer', x: 300, y: 200, w: 300, h: 100, visible: false },
-              weather: { id: 'weather', x: 300, y: -200, w: 250, h: 120, visible: false },
-              quote: { id: 'quote', x: -300, y: 200, w: 300, h: 100, visible: false },
-              date: { id: 'date', x: 0, y: -20, w: 400, h: 50, visible: false },
-          }
+      resetLayout: () => set((state) => {
+          // Reset only the core widgets, but maybe we should keep tile layouts?
+          // Or just reset everything.
+          // For now, let's keep tile layouts if they exist, but reset core ones.
+          const currentLayout = state.layout;
+          const newLayout = { ...DEFAULT_LAYOUT };
+          
+          // Preserve tile layouts but reset their positions? Or just keep them as is?
+          // If we want "reset" to mean "restore factory defaults", we might clear tiles.
+          // But usually users just want to fix the clock position.
+          // Let's preserve tile layouts but maybe ensure they are visible?
+          Object.keys(currentLayout).forEach(key => {
+              if (key.startsWith('tile_')) {
+                  // @ts-ignore
+                  newLayout[key] = currentLayout[key];
+              }
+          });
+
+          return { layout: newLayout };
       }),
       exportLayout: () => {
           const state = get();
@@ -133,7 +199,8 @@ export const useStore = create<AppState>()(
               v: 1,
               e: state.searchEngine[0],
               s: state.showSeconds ? 1 : 0,
-              l: compact
+              l: compact,
+              t: state.tiles // Export tiles data too
           };
           const json = JSON.stringify(data);
           const base64 = btoa(unescape(encodeURIComponent(json)));
@@ -152,10 +219,12 @@ export const useStore = create<AppState>()(
                   const arr = v as number[];
                   layout[k] = { id: k, x: arr[0], y: arr[1], w: arr[2], h: arr[3], visible: arr[4] === 1 };
               });
+              
               set({
-                  layout: layout as AppState['layout'],
+                  layout: layout as Record<string, LayoutItem>,
                   searchEngine: engines[data.e] || 'google',
-                  showSeconds: data.s === 1
+                  showSeconds: data.s === 1,
+                  tiles: data.t || [] // Import tiles if present
               });
               return true;
           } catch {
@@ -173,6 +242,7 @@ export const useStore = create<AppState>()(
         backgroundImageSource: state.backgroundImageSource,
         showSeconds: state.showSeconds,
         shortcuts: state.shortcuts,
+        tiles: state.tiles,
         layout: state.layout
       }),
     }
