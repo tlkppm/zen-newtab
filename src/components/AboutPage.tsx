@@ -17,11 +17,23 @@ const AppIcon = () => (
 export const AboutPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('about');
   
-  const version = '1.0.3';
+  const version = '1.0.4';
   const buildDate = '2026-01-28';
   const repoUrl = 'https://github.com/tlkppm/zen-newtab';
 
   const changelog = [
+    {
+      version: '1.0.4',
+      date: '2026-01-28',
+      tag: `${repoUrl}/releases/tag/v1.0.4`,
+      changes: [
+        '新增蓝图可视化编辑器，支持节点式组件行为定义',
+        '集成 Monaco 代码编辑器，支持语法高亮和智能提示',
+        '新增实时代码错误检测功能',
+        '新增 Toast 通知系统，统一用户操作反馈',
+        '修复蓝图节点连接线显示问题',
+      ]
+    },
     {
       version: '1.0.3',
       date: '2026-01-28',
@@ -77,6 +89,7 @@ export const AboutPage = () => {
   ];
 
   const thirdPartyLicenses = [
+    { name: '@monaco-editor/react', version: '4.7.0', license: 'MIT', url: 'https://github.com/suren-atoyan/monaco-react' },
     { name: 'React', version: '18.3.1', license: 'MIT', url: 'https://github.com/facebook/react' },
     { name: 'React DOM', version: '18.3.1', license: 'MIT', url: 'https://github.com/facebook/react' },
     { name: 'TypeScript', version: '5.8.3', license: 'Apache-2.0', url: 'https://github.com/microsoft/TypeScript' },
