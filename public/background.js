@@ -105,7 +105,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ id: chrome.runtime.id });
     return false;
   }
+  
+  // Check for updates
+  if (request.type === 'CHECK_UPDATE') {
+    const currentVersion = chrome.runtime.getManifest().version;
+    fetch('https://api.github.com/repos/tlkppm/zen-newtab/releases/latest')
+      .then(res => res.json())
+      .then(data => {
+        const latestVersion = data.tag_name?.replace('v', '') || currentVersion;
+        const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+        sendResponse({
+          hasUpdate,
+          currentVersion,
+          latestVersion,
+          releaseUrl: data.html_url || '',
+          releaseNotes: data.body || '',
+          publishedAt: data.published_at || ''
+        });
+      })
+      .catch(() => {
+        sendResponse({ hasUpdate: false, currentVersion, error: '检查更新失败' });
+      });
+    return true;
+  }
 });
+
+// Version comparison helper
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    if (p1 > p2) return 1;
+    if (p1 < p2) return -1;
+  }
+  return 0;
+}
 
 // Download completion notification
 chrome.downloads?.onChanged?.addListener((delta) => {

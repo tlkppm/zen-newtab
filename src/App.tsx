@@ -19,6 +19,7 @@ import { Pomodoro } from './components/Pomodoro';
 import { Tiles, SingleTile, TileEditor } from './components/Tiles';
 import { PhotoGridGenerator } from './components/PhotoGridGenerator';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { UpdateNotification } from './components/UpdateNotification';
 import { saveVideoToDB, clearVideoFromDB, saveImageToDB, getImageFromDB, getVideoFromDB, clearImageFromDB } from './lib/db';
 
 type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions' | 'about';
@@ -1233,6 +1234,9 @@ function App() {
           </div>
         </div>
       )}
+      
+      {/* Update Notification */}
+      <UpdateNotification />
     </div>
   );
 }

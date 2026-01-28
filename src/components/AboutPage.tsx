@@ -17,11 +17,21 @@ const AppIcon = () => (
 export const AboutPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('about');
   
-  const version = '1.0.2';
+  const version = '1.0.3';
   const buildDate = '2026-01-28';
   const repoUrl = 'https://github.com/tlkppm/zen-newtab';
 
   const changelog = [
+    {
+      version: '1.0.3',
+      date: '2026-01-28',
+      tag: `${repoUrl}/releases/tag/v1.0.3`,
+      changes: [
+        '新增版本更新提示功能',
+        '自动检测 GitHub 最新版本并弹窗提醒',
+        '支持忽略当前版本提醒',
+      ]
+    },
     {
       version: '1.0.2',
       date: '2026-01-28',

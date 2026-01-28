@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "静谧新标签页",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Chrome 和 Edge 的极简、无渐变新标签页扩展。",
   "update_url": "https://tlkppm.github.io/zen-newtab/updates.xml",
   "homepage_url": "https://github.com/tlkppm/zen-newtab",
