@@ -1,23 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Cloud, CloudRain, CloudSun, Sun, Wind, CloudSnow, CloudLightning, Loader2, MapPin } from 'lucide-react';
+import { Cloud, CloudRain, CloudSun, Sun, Wind, CloudSnow, CloudLightning, Loader2, MapPin, CloudFog, CloudDrizzle } from 'lucide-react';
 
 interface WeatherData {
   temp: number;
   condition: string;
-  conditionCode: number;
+  conditionCode: string;
   location: string;
   humidity: number;
   wind: number;
 }
-
-const conditionMap: Record<number, string> = {
-  0: '晴朗', 1: '晴朗', 2: '局部多云', 3: '多云',
-  45: '雾', 48: '雾', 51: '小雨', 53: '中雨', 55: '大雨',
-  56: '冻雨', 57: '冻雨', 61: '小雨', 63: '中雨', 65: '大雨',
-  66: '冻雨', 67: '冻雨', 71: '小雪', 73: '中雪', 75: '大雪',
-  77: '雪', 80: '阵雨', 81: '阵雨', 82: '暴雨',
-  85: '阵雪', 86: '阵雪', 95: '雷暴', 96: '雷暴', 99: '雷暴'
-};
 
 export const Weather = () => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -25,57 +16,141 @@ export const Weather = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchWeather = async (lat: number, lon: number) => {
+    const getChineseLocation = async (lat: number, lon: number): Promise<string> => {
       try {
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-        const geoData = await geoRes.json();
-        const city = geoData.address?.city || geoData.address?.town || geoData.address?.county || '未知';
-
-        const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`
+        const res = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=zh`
         );
-        const weatherData = await weatherRes.json();
-        const current = weatherData.current;
-
-        setWeather({
-          temp: Math.round(current.temperature_2m),
-          condition: conditionMap[current.weather_code] || '未知',
-          conditionCode: current.weather_code,
-          location: city,
-          humidity: current.relative_humidity_2m,
-          wind: Math.round(current.wind_speed_10m)
-        });
-        setLoading(false);
-      } catch (e) {
-        setError('获取天气失败');
-        setLoading(false);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        return data.city || data.locality || data.principalSubdivision || data.countryName || '未知位置';
+      } catch {
+        return '未知位置';
       }
     };
 
-    if (navigator.geolocation) {
+    const fetchWeatherByIP = async () => {
+      try {
+        const res = await fetch('https://wttr.in/?format=j1', {
+          headers: { 'Accept-Language': 'zh-CN' }
+        });
+        if (!res.ok) throw new Error('wttr.in 请求失败');
+        const data = await res.json();
+        const current = data.current_condition?.[0];
+        const area = data.nearest_area?.[0];
+        
+        if (!current) throw new Error('无天气数据');
+
+        let location = '未知位置';
+        if (area?.latitude && area?.longitude) {
+          location = await getChineseLocation(
+            parseFloat(area.latitude),
+            parseFloat(area.longitude)
+          );
+        }
+
+        const conditionCN = current.lang_zh?.[0]?.value || current.weatherDesc?.[0]?.value || '未知';
+
+        setWeather({
+          temp: parseInt(current.temp_C, 10),
+          condition: conditionCN,
+          conditionCode: current.weatherCode || '0',
+          location,
+          humidity: parseInt(current.humidity, 10),
+          wind: Math.round(parseInt(current.windspeedKmph, 10))
+        });
+        setLoading(false);
+      } catch {
+        tryFallbackAPI();
+      }
+    };
+
+    const tryFallbackAPI = async () => {
+      if (!navigator.geolocation) {
+        setError('浏览器不支持定位');
+        setLoading(false);
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
-        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            
+            const [weatherRes, locationName] = await Promise.all([
+              fetch(`https://wttr.in/${latitude},${longitude}?format=j1`, {
+                headers: { 'Accept-Language': 'zh-CN' }
+              }),
+              getChineseLocation(latitude, longitude)
+            ]);
+            
+            if (!weatherRes.ok) throw new Error('请求失败');
+            const data = await weatherRes.json();
+            const current = data.current_condition?.[0];
+
+            if (!current) throw new Error('无数据');
+
+            const conditionCN = current.lang_zh?.[0]?.value || current.weatherDesc?.[0]?.value || '未知';
+
+            setWeather({
+              temp: parseInt(current.temp_C, 10),
+              condition: conditionCN,
+              conditionCode: current.weatherCode || '0',
+              location: locationName,
+              humidity: parseInt(current.humidity, 10),
+              wind: Math.round(parseInt(current.windspeedKmph, 10))
+            });
+            setLoading(false);
+          } catch {
+            setError('获取天气失败');
+            setLoading(false);
+          }
+        },
         () => {
           setError('需要位置权限');
           setLoading(false);
         },
         { timeout: 10000 }
       );
-    } else {
-      setError('浏览器不支持定位');
-      setLoading(false);
-    }
+    };
+
+    fetchWeatherByIP();
   }, []);
 
   const getIcon = () => {
     if (!weather) return <Cloud size={32} className="text-white" />;
-    const code = weather.conditionCode;
-    if (code >= 95) return <CloudLightning size={32} className="text-yellow-300" />;
-    if (code >= 71 && code <= 86) return <CloudSnow size={32} className="text-blue-100" />;
-    if (code >= 51 && code <= 82) return <CloudRain size={32} className="text-blue-300" />;
-    if (code === 2) return <CloudSun size={32} className="text-yellow-100" />;
-    if (code === 3 || code >= 45) return <Cloud size={32} className="text-white" />;
-    return <Sun size={32} className="text-yellow-400" />;
+    const code = parseInt(weather.conditionCode, 10);
+    const condition = weather.condition.toLowerCase();
+    
+    if (condition.includes('雷') || condition.includes('thunder')) {
+      return <CloudLightning size={32} className="text-yellow-300" />;
+    }
+    if (condition.includes('雪') || condition.includes('snow')) {
+      return <CloudSnow size={32} className="text-blue-100" />;
+    }
+    if (condition.includes('雨') || condition.includes('rain') || condition.includes('drizzle')) {
+      return <CloudRain size={32} className="text-blue-300" />;
+    }
+    if (condition.includes('雾') || condition.includes('fog') || condition.includes('mist')) {
+      return <CloudFog size={32} className="text-gray-300" />;
+    }
+    if (condition.includes('阴') || condition.includes('多云') || condition.includes('overcast') || condition.includes('cloudy')) {
+      return <Cloud size={32} className="text-white" />;
+    }
+    if (condition.includes('晴') || condition.includes('sunny') || condition.includes('clear')) {
+      if (condition.includes('云') || condition.includes('partly')) {
+        return <CloudSun size={32} className="text-yellow-100" />;
+      }
+      return <Sun size={32} className="text-yellow-400" />;
+    }
+    if (code >= 200 && code < 300) return <CloudLightning size={32} className="text-yellow-300" />;
+    if (code >= 300 && code < 400) return <CloudDrizzle size={32} className="text-blue-200" />;
+    if (code >= 500 && code < 600) return <CloudRain size={32} className="text-blue-300" />;
+    if (code >= 600 && code < 700) return <CloudSnow size={32} className="text-blue-100" />;
+    if (code >= 700 && code < 800) return <CloudFog size={32} className="text-gray-300" />;
+    if (code === 800) return <Sun size={32} className="text-yellow-400" />;
+    if (code > 800) return <CloudSun size={32} className="text-yellow-100" />;
+    return <Cloud size={32} className="text-white" />;
   };
 
   if (loading) {

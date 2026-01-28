@@ -190,41 +190,88 @@ export const useStore = create<AppState>()(
       }),
       exportLayout: () => {
           const state = get();
-          const compact: Record<string, number[]> = {};
-          Object.entries(state.layout).forEach(([k, v]) => {
-              compact[k] = [v.x, v.y, v.w, v.h, v.visible ? 1 : 0];
-          });
-          const data = {
-              _: '静谧新标签页',
-              v: 1,
-              e: state.searchEngine[0],
-              s: state.showSeconds ? 1 : 0,
-              l: compact,
-              t: state.tiles // Export tiles data too
+          const keyMap: Record<string, string> = {
+              clock: 'c', search: 's', shortcuts: 'h', mediaPlayer: 'm',
+              weather: 'w', quote: 'q', date: 'd', tiles: 't',
+              calendar: 'a', pomodoro: 'p', memo: 'e', todo: 'o'
           };
-          const json = JSON.stringify(data);
-          const base64 = btoa(unescape(encodeURIComponent(json)));
-          return `ZEN://${base64}`;
+          const compact: Record<string, string> = {};
+          Object.entries(state.layout).forEach(([k, v]) => {
+              const key = keyMap[k] || k;
+              compact[key] = `${v.x},${v.y},${v.w},${v.h},${v.visible ? 1 : 0}`;
+          });
+          
+          const tilesCompact = state.tiles.map(t => 
+              `${t.id}|${t.title || ''}|${t.url}|${t.color.replace('bg-', '')}|${t.icon}`
+          ).join(';');
+          
+          const parts = [
+              '2',
+              state.searchEngine[0],
+              state.showSeconds ? '1' : '0',
+              Object.entries(compact).map(([k, v]) => `${k}:${v}`).join('|'),
+              tilesCompact
+          ];
+          
+          const data = parts.join('~');
+          const compressed = btoa(unescape(encodeURIComponent(data)))
+              .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          return `ZEN${compressed}`;
       },
       importLayout: (code: string) => {
           try {
-              if (!code.startsWith('ZEN://')) return false;
-              const base64 = code.replace('ZEN://', '');
-              const json = decodeURIComponent(escape(atob(base64)));
-              const data = JSON.parse(json);
-              if (data.v !== 1 || !data.l) return false;
+              if (code.startsWith('ZEN://')) {
+                  const base64 = code.replace('ZEN://', '');
+                  const json = decodeURIComponent(escape(atob(base64)));
+                  const data = JSON.parse(json);
+                  if (data.v !== 1 || !data.l) return false;
+                  const engines: Record<string, SearchEngine> = { g: 'google', b: 'bing', a: 'baidu' };
+                  const layout: Record<string, LayoutItem> = {};
+                  Object.entries(data.l).forEach(([k, v]) => {
+                      const arr = v as number[];
+                      layout[k] = { id: k, x: arr[0], y: arr[1], w: arr[2], h: arr[3], visible: arr[4] === 1 };
+                  });
+                  set({
+                      layout: layout as Record<string, LayoutItem>,
+                      searchEngine: engines[data.e] || 'google',
+                      showSeconds: data.s === 1,
+                      tiles: data.t || []
+                  });
+                  return true;
+              }
+              
+              if (!code.startsWith('ZEN')) return false;
+              const compressed = code.replace('ZEN', '');
+              const padded = compressed.replace(/-/g, '+').replace(/_/g, '/');
+              const data = decodeURIComponent(escape(atob(padded)));
+              const parts = data.split('~');
+              if (parts[0] !== '2') return false;
+              
+              const keyMap: Record<string, string> = {
+                  c: 'clock', s: 'search', h: 'shortcuts', m: 'mediaPlayer',
+                  w: 'weather', q: 'quote', d: 'date', t: 'tiles',
+                  a: 'calendar', p: 'pomodoro', e: 'memo', o: 'todo'
+              };
               const engines: Record<string, SearchEngine> = { g: 'google', b: 'bing', a: 'baidu' };
+              
               const layout: Record<string, LayoutItem> = {};
-              Object.entries(data.l).forEach(([k, v]) => {
-                  const arr = v as number[];
-                  layout[k] = { id: k, x: arr[0], y: arr[1], w: arr[2], h: arr[3], visible: arr[4] === 1 };
+              parts[3].split('|').forEach(item => {
+                  const [key, vals] = item.split(':');
+                  const [x, y, w, h, v] = vals.split(',').map(Number);
+                  const fullKey = keyMap[key] || key;
+                  layout[fullKey] = { id: fullKey, x, y, w, h, visible: v === 1 };
               });
               
+              const tiles: Tile[] = parts[4] ? parts[4].split(';').filter(Boolean).map(t => {
+                  const [id, title, url, color, icon] = t.split('|');
+                  return { id, title: title || undefined, url, color: `bg-${color}`, icon };
+              }) : [];
+              
               set({
-                  layout: layout as Record<string, LayoutItem>,
-                  searchEngine: engines[data.e] || 'google',
-                  showSeconds: data.s === 1,
-                  tiles: data.t || [] // Import tiles if present
+                  layout,
+                  searchEngine: engines[parts[1]] || 'google',
+                  showSeconds: parts[2] === '1',
+                  tiles
               });
               return true;
           } catch {
