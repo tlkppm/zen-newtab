@@ -17,11 +17,22 @@ const AppIcon = () => (
 export const AboutPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('about');
   
-  const version = '1.0.1';
-  const buildDate = '2026-01-27';
+  const version = '1.0.2';
+  const buildDate = '2026-01-28';
   const repoUrl = 'https://github.com/tlkppm/zen-newtab';
 
   const changelog = [
+    {
+      version: '1.0.2',
+      date: '2026-01-28',
+      tag: `${repoUrl}/releases/tag/v1.0.2`,
+      changes: [
+        '天气 API 改用 wttr.in，国内可直接访问无需代理',
+        '天气地理位置显示中文地名',
+        '分享码格式优化，长度减少约 40%',
+        '兼容旧版分享码导入',
+      ]
+    },
     {
       version: '1.0.1',
       date: '2026-01-27',
