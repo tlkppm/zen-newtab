@@ -16,6 +16,9 @@ import { TodoList } from './components/TodoList';
 import { Memo } from './components/Memo';
 import { CalendarWidget } from './components/CalendarWidget';
 import { Pomodoro } from './components/Pomodoro';
+import { DevUtils } from './components/DevUtils';
+import { FocusSounds } from './components/FocusSounds';
+import { DeepBreath } from './components/DeepBreath';
 import { Tiles, SingleTile, TileEditor } from './components/Tiles';
 import { PhotoGridGenerator } from './components/PhotoGridGenerator';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -23,6 +26,7 @@ import { UpdateNotification } from './components/UpdateNotification';
 import { WidgetEditor, CustomWidgetRenderer } from './components/WidgetEditor';
 import { saveVideoToDB, clearVideoFromDB, saveImageToDB, getImageFromDB, getVideoFromDB, clearImageFromDB } from './lib/db';
 import { ToastContainer } from './components/Toast';
+import { SettingsModal } from './components/SettingsModal';
 
 type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions' | 'about';
 
@@ -235,8 +239,19 @@ function App() {
     addTile,
     customWidgets,
     isNavBarVisible,
-    toggleNavBar
+    toggleNavBar,
+    showBookmarksOnStartup,
+    toggleShowBookmarksOnStartup,
+    bookmarkIconSize,
+    setBookmarkIconSize
   } = useStore();
+  
+  // Initialize view mode based on settings
+  useEffect(() => {
+    if (showBookmarksOnStartup) {
+      setViewMode('bookmarks');
+    }
+  }, []);
   
   // ... existing state ...
   const [bgUrlInput, setBgUrlInput] = useState('');
@@ -251,6 +266,52 @@ function App() {
   const [isTileEditorOpen, setIsTileEditorOpen] = useState(false);
   const [isPhotoGridOpen, setIsPhotoGridOpen] = useState(false);
   const [isWidgetEditorOpen, setIsWidgetEditorOpen] = useState(false);
+  const [clipboardShareCode, setClipboardShareCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const extractShareCode = (text: string): string | null => {
+      const zenMatch = text.match(/ZEN:\/\/[A-Za-z0-9+/=]+/);
+      if (zenMatch) return zenMatch[0];
+      const zenCompactMatch = text.match(/ZEN[A-Za-z0-9_-]{20,}/);
+      if (zenCompactMatch) return zenCompactMatch[0];
+      return null;
+    };
+
+    const checkClipboard = async () => {
+      try {
+        if (!document.hasFocus()) return;
+        const text = await navigator.clipboard.readText();
+        const shareCode = extractShareCode(text);
+        if (shareCode) {
+          const lastHandled = sessionStorage.getItem('lastHandledShareCode');
+          if (lastHandled !== shareCode) {
+            setClipboardShareCode(shareCode);
+          }
+        }
+      } catch {
+      }
+    };
+
+    checkClipboard();
+
+    const handleFocus = () => checkClipboard();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  const handleClipboardImport = () => {
+    if (clipboardShareCode && importLayout(clipboardShareCode)) {
+      sessionStorage.setItem('lastHandledShareCode', clipboardShareCode);
+      setClipboardShareCode(null);
+    }
+  };
+
+  const dismissClipboardPrompt = () => {
+    if (clipboardShareCode) {
+      sessionStorage.setItem('lastHandledShareCode', clipboardShareCode);
+      setClipboardShareCode(null);
+    }
+  };
 
   // Drag state for alignment guides
   const [dragBounds, setDragBounds] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
@@ -569,6 +630,9 @@ function App() {
                         memo: { label: '便签', icon: <StickyNote size={18} /> },
                         pomodoro: { label: '番茄', icon: <Timer size={18} /> },
                         mediaPlayer: { label: '音乐', icon: <Music size={18} /> },
+                        devUtils: { label: '工具', icon: <Code size={18} /> },
+                        focusSounds: { label: '白噪音', icon: <Cloud size={18} /> },
+                        deepBreath: { label: '深呼吸', icon: <Scaling size={18} /> },
                     }).map(([key, { label, icon }]) => (
                         <button
                             key={key}
@@ -879,6 +943,72 @@ function App() {
                      <Pomodoro />
                  </ResizableDraggable>
 
+                 {/* Dev Utils Widget */}
+                 {/* @ts-ignore */}
+                 <ResizableDraggable 
+                    id="devUtils" 
+                    // @ts-ignore
+                    x={layout.devUtils?.x || -300} 
+                    // @ts-ignore
+                    y={layout.devUtils?.y || -200} 
+                    // @ts-ignore
+                    w={layout.devUtils?.w || 300} 
+                    // @ts-ignore
+                    h={layout.devUtils?.h || 300} 
+                    onUpdate={handleUpdate} 
+                    isEditing={isEditingLayout}
+                    // @ts-ignore
+                    visible={layout.devUtils?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
+                 >
+                     <DevUtils />
+                 </ResizableDraggable>
+
+                 {/* Focus Sounds Widget */}
+                 {/* @ts-ignore */}
+                 <ResizableDraggable 
+                    id="focusSounds" 
+                    // @ts-ignore
+                    x={layout.focusSounds?.x || 300} 
+                    // @ts-ignore
+                    y={layout.focusSounds?.y || 200} 
+                    // @ts-ignore
+                    w={layout.focusSounds?.w || 280} 
+                    // @ts-ignore
+                    h={layout.focusSounds?.h || 240} 
+                    onUpdate={handleUpdate} 
+                    isEditing={isEditingLayout}
+                    // @ts-ignore
+                    visible={layout.focusSounds?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
+                 >
+                     <FocusSounds />
+                 </ResizableDraggable>
+
+                 {/* Deep Breath Widget */}
+                 {/* @ts-ignore */}
+                 <ResizableDraggable 
+                    id="deepBreath" 
+                    // @ts-ignore
+                    x={layout.deepBreath?.x || 0} 
+                    // @ts-ignore
+                    y={layout.deepBreath?.y || 0} 
+                    // @ts-ignore
+                    w={layout.deepBreath?.w || 300} 
+                    // @ts-ignore
+                    h={layout.deepBreath?.h || 300} 
+                    onUpdate={handleUpdate} 
+                    isEditing={isEditingLayout}
+                    // @ts-ignore
+                    visible={layout.deepBreath?.visible ?? false}
+                    onDragState={handleDragState}
+                    allBounds={getAllBounds()}
+                 >
+                     <DeepBreath />
+                 </ResizableDraggable>
+
                  {/* Individual Tiles */}
                  {tiles.map((tile) => {
                      const layoutId = `tile_${tile.id}`;
@@ -1050,253 +1180,53 @@ function App() {
       </main>
 
       {/* Settings Modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/50 backdrop-blur-sm" onClick={() => setIsSettingsOpen(false)}>
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-white text-lg font-medium mb-6">设置</h3>
-            
-            <div className="space-y-6">
-              {/* Clock Settings */}
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-300">显示秒数</span>
-                <button 
-                  onClick={toggleShowSeconds}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${showSeconds ? 'bg-blue-600' : 'bg-zinc-700'}`}
-                >
-                  <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${showSeconds ? 'translate-x-6' : 'translate-x-0'}`} />
-                </button>
-              </div>
-
-              {/* Search Engine Settings */}
-              <div>
-                <span className="text-zinc-300 block mb-2 font-medium">默认搜索引擎</span>
-                <div className="flex gap-2">
-                    {['google', 'bing', 'baidu'].map((engine) => (
-                        <button
-                            key={engine}
-                            onClick={() => setSearchEngine(engine as any)}
-                            className={`flex-1 py-2 rounded-lg text-sm capitalize transition-colors ${searchEngine === engine ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
-                        >
-                            {engine}
-                        </button>
-                    ))}
-                </div>
-              </div>
-
-              <div className="h-px bg-zinc-800" />
-
-              {/* Background Settings */}
-              <div>
-                <span className="text-zinc-300 block mb-2 font-medium">背景设置</span>
-                
-                <div className="flex gap-2 mb-4">
-                    <button 
-                        onClick={switchToImage}
-                        className={`flex-1 py-2 rounded-lg text-sm transition-colors ${backgroundType === 'image' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
-                    >
-                        图片
-                    </button>
-                    <button 
-                        onClick={() => setBackgroundType('video')}
-                        className={`flex-1 py-2 rounded-lg text-sm transition-colors ${backgroundType === 'video' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
-                    >
-                        视频
-                    </button>
-                </div>
-
-                {backgroundType === 'image' ? (
-                    <>
-                        <div className="mb-4">
-                            <span className="text-zinc-400 text-xs block mb-2">本地图片</span>
-                            {localImagePreview ? (
-                                <div className="space-y-2">
-                                    <div className="relative rounded-lg overflow-hidden h-24">
-                                        <img src={localImagePreview} alt="本地图片预览" className="w-full h-full object-cover" />
-                                        {backgroundImageSource === 'local' && (
-                                            <div className="absolute top-1 right-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">使用中</div>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {backgroundImageSource !== 'local' && (
-                                            <button 
-                                                onClick={() => applyLocalImage()}
-                                                className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition-colors"
-                                            >
-                                                使用本地图片
-                                            </button>
-                                        )}
-                                        <label className="flex-1 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition-colors cursor-pointer text-center">
-                                            重新上传
-                                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                                        </label>
-                                    </div>
-                                    {imageUploadStatus && <span className="text-blue-400 text-xs">{imageUploadStatus}</span>}
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 rounded-xl p-4 hover:border-zinc-500 transition-colors cursor-pointer relative group">
-                                    <input 
-                                        type="file" 
-                                        accept="image/*"
-                                        onChange={handleImageUpload}
-                                        className="absolute inset-0 opacity-0 cursor-pointer"
-                                    />
-                                    <Upload className="text-zinc-400 mb-2 group-hover:text-white transition-colors" />
-                                    <span className="text-zinc-400 text-sm group-hover:text-white transition-colors">点击上传本地图片 (Max 10MB)</span>
-                                    {imageUploadStatus && <span className="text-blue-400 text-xs mt-2">{imageUploadStatus}</span>}
-                                </div>
-                            )}
-                        </div>
-
-                        <span className="text-zinc-400 text-xs block mb-2">或者使用网络图片链接</span>
-                        <form onSubmit={handleBgSubmit} className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="https://..."
-                            value={bgUrlInput}
-                            onChange={(e) => setBgUrlInput(e.target.value)}
-                            className="flex-1 bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none text-sm"
-                        />
-                        <button type="submit" className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg border border-zinc-700 text-sm transition-colors">
-                            应用
-                        </button>
-                        </form>
-                        <div className="mt-2 text-xs text-zinc-500">
-                        提示: 如果上传了本地图片，将优先显示本地图片。输入链接并应用可切换回网络图片。
-                        </div>
-                    </>
-                ) : (
-                    <div>
-                        {localVideoPreview ? (
-                            <div className="space-y-2">
-                                <div className="relative rounded-lg overflow-hidden h-24">
-                                    <video src={localVideoPreview} className="w-full h-full object-cover" muted />
-                                    <div className="absolute top-1 right-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">已上传</div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <label className="flex-1 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition-colors cursor-pointer text-center">
-                                        重新上传视频
-                                        <input type="file" accept="video/mp4,video/webm" onChange={handleVideoUpload} className="hidden" />
-                                    </label>
-                                </div>
-                                {uploadStatus && <span className="text-blue-400 text-xs">{uploadStatus}</span>}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 rounded-xl p-4 hover:border-zinc-500 transition-colors cursor-pointer relative group">
-                                <input 
-                                    type="file" 
-                                    accept="video/mp4,video/webm"
-                                    onChange={handleVideoUpload}
-                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                />
-                                <Upload className="text-zinc-400 mb-2 group-hover:text-white transition-colors" />
-                                <span className="text-zinc-400 text-sm group-hover:text-white transition-colors">点击上传本地视频 (Max 50MB)</span>
-                                {uploadStatus && <span className="text-blue-400 text-xs mt-2">{uploadStatus}</span>}
-                            </div>
-                        )}
-                    </div>
-                )}
-              </div>
-
-              <div className="h-px bg-zinc-800" />
-
-              <button
-                onClick={() => { setIsSettingsOpen(false); setIsShareOpen(true); }}
-                className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors font-medium"
-              >
-                布局分享与导入
-              </button>
-            </div>
-
-            <div className="mt-8 flex justify-end">
-              <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-zinc-400 hover:text-white transition-colors">关闭</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isShareOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/50 backdrop-blur-sm" onClick={() => setIsShareOpen(false)}>
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-[420px] shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="text-center mb-6">
-              <h3 className="text-white text-xl font-bold">静谧新标签页</h3>
-              <p className="text-zinc-500 text-xs mt-1">布局分享 · 让美好与他人共享</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="p-4 bg-zinc-800/50 rounded-xl">
-                <h4 className="text-zinc-300 text-sm font-medium mb-3">导出我的布局</h4>
-                <button
-                  onClick={() => {
-                    const code = exportLayout();
-                    setShareCode(code);
-                  }}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors font-medium"
-                >
-                  生成分享码
-                </button>
-                {shareCode && (
-                  <div className="mt-3 p-3 bg-zinc-900 rounded-lg border border-zinc-700">
-                    <p className="text-xs text-zinc-300 break-all font-mono leading-relaxed select-all">{shareCode}</p>
-                    <button
-                      onClick={() => {
-                        const shareText = `【静谧新标签页】布局分享\n\n我正在使用「静谧新标签页」，这是我的布局配置，复制下方代码即可导入：\n\n${shareCode}\n\n下载扩展：https://github.com/tlkppm/zen-newtab`;
-                        navigator.clipboard.writeText(shareText);
-                        setShareMessage('已复制分享内容');
-                        setTimeout(() => setShareMessage(''), 2000);
-                      }}
-                      className="w-full mt-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-xs rounded-lg transition-colors"
-                    >
-                      复制分享内容
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 bg-zinc-800/50 rounded-xl">
-                <h4 className="text-zinc-300 text-sm font-medium mb-3">导入他人布局</h4>
-                <input
-                  type="text"
-                  value={importCode}
-                  onChange={(e) => setImportCode(e.target.value)}
-                  placeholder="粘贴分享码 ZEN://..."
-                  className="w-full bg-zinc-900 text-white px-3 py-2.5 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none text-sm font-mono"
-                />
-                <button
-                  onClick={() => {
-                    if (importLayout(importCode)) {
-                      setShareMessage('导入成功');
-                      setImportCode('');
-                      setShareCode('');
-                    } else {
-                      setShareMessage('分享码无效');
-                    }
-                    setTimeout(() => setShareMessage(''), 2000);
-                  }}
-                  className="w-full mt-3 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors font-medium"
-                >
-                  应用布局
-                </button>
-              </div>
-
-              {shareMessage && (
-                <p className={`text-center text-sm font-medium ${shareMessage.includes('成功') ? 'text-green-400' : 'text-red-400'}`}>
-                  {shareMessage}
-                </p>
-              )}
-            </div>
-
-            <div className="mt-6 flex justify-center">
-              <button onClick={() => { setIsShareOpen(false); setShareCode(''); setImportCode(''); }} className="px-6 py-2 text-zinc-400 hover:text-white transition-colors">
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+      />
       
       {/* Update Notification */}
       <UpdateNotification />
       <ToastContainer />
+
+      {/* 剪贴板分享码提示 */}
+      {clipboardShareCode && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center">
+                <Upload size={20} className="text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-medium">检测到分享码</h3>
+                <p className="text-zinc-400 text-sm">剪贴板中包含布局分享码</p>
+              </div>
+            </div>
+            <div className="bg-zinc-800 rounded-lg p-3 mb-4 font-mono text-xs text-zinc-400 break-all max-h-20 overflow-y-auto">
+              {clipboardShareCode.length > 100 
+                ? clipboardShareCode.slice(0, 100) + '...' 
+                : clipboardShareCode}
+            </div>
+            <p className="text-zinc-500 text-sm mb-4">
+              是否导入此布局？导入后将覆盖当前布局设置。
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={dismissClipboardPrompt}
+                className="flex-1 px-4 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              >
+                忽略
+              </button>
+              <button
+                onClick={handleClipboardImport}
+                className="flex-1 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+              >
+                导入布局
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

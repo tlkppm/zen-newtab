@@ -94,6 +94,12 @@ interface AppState {
 
   isNavBarVisible: boolean;
   toggleNavBar: () => void;
+
+  showBookmarksOnStartup: boolean;
+  toggleShowBookmarksOnStartup: () => void;
+
+  bookmarkIconSize: 'small' | 'medium' | 'large';
+  setBookmarkIconSize: (size: 'small' | 'medium' | 'large') => void;
 }
 
 const DEFAULT_LAYOUT = {
@@ -108,6 +114,9 @@ const DEFAULT_LAYOUT = {
     todo: { id: 'todo', x: -400, y: 0, w: 300, h: 400, visible: false },
     memo: { id: 'memo', x: 400, y: 0, w: 300, h: 300, visible: false },
     pomodoro: { id: 'pomodoro', x: 0, y: 200, w: 300, h: 320, visible: false },
+    devUtils: { id: 'devUtils', x: -300, y: -200, w: 300, h: 300, visible: false },
+    focusSounds: { id: 'focusSounds', x: 300, y: 200, w: 280, h: 240, visible: false },
+    deepBreath: { id: 'deepBreath', x: 0, y: 0, w: 300, h: 300, visible: false },
     about: { id: 'about', x: 0, y: 0, w: 400, h: 300, visible: false },
 };
 
@@ -222,6 +231,12 @@ export const useStore = create<AppState>()(
       isNavBarVisible: true,
       toggleNavBar: () => set((state) => ({ isNavBarVisible: !state.isNavBarVisible })),
 
+      showBookmarksOnStartup: false,
+      toggleShowBookmarksOnStartup: () => set((state) => ({ showBookmarksOnStartup: !state.showBookmarksOnStartup })),
+
+      bookmarkIconSize: 'medium',
+      setBookmarkIconSize: (size) => set({ bookmarkIconSize: size }),
+
       updateCustomWidget: (id, updates) => set((state) => ({
           customWidgets: state.customWidgets.map(w => 
               w.id === id ? { ...w, ...updates, updatedAt: Date.now() } : w
@@ -241,7 +256,8 @@ export const useStore = create<AppState>()(
           const keyMap: Record<string, string> = {
               clock: 'c', search: 's', shortcuts: 'h', mediaPlayer: 'm',
               weather: 'w', quote: 'q', date: 'd', tiles: 't',
-              calendar: 'a', pomodoro: 'p', memo: 'e', todo: 'o'
+              calendar: 'a', pomodoro: 'p', memo: 'e', todo: 'o',
+              devUtils: 'u', focusSounds: 'f', deepBreath: 'b'
           };
           const compact: Record<string, string> = {};
           Object.entries(state.layout).forEach(([k, v]) => {
@@ -306,7 +322,8 @@ export const useStore = create<AppState>()(
               const keyMap: Record<string, string> = {
                   c: 'clock', s: 'search', h: 'shortcuts', m: 'mediaPlayer',
                   w: 'weather', q: 'quote', d: 'date', t: 'tiles',
-                  a: 'calendar', p: 'pomodoro', e: 'memo', o: 'todo'
+                  a: 'calendar', p: 'pomodoro', e: 'memo', o: 'todo',
+                  u: 'devUtils', f: 'focusSounds', b: 'deepBreath'
               };
               const engines: Record<string, SearchEngine> = { g: 'google', b: 'bing', a: 'baidu' };
               
@@ -345,17 +362,19 @@ export const useStore = create<AppState>()(
     {
       name: 'zen-newtab-storage',
       partialize: (state) => ({ 
-        // Do not persist backgroundVideo blob URL as it expires
         searchEngine: state.searchEngine,
         backgroundType: state.backgroundType,
         backgroundImage: state.backgroundImage,
         backgroundImageSource: state.backgroundImageSource,
+        imageTimestamp: state.imageTimestamp,
         showSeconds: state.showSeconds,
         shortcuts: state.shortcuts,
         tiles: state.tiles,
         layout: state.layout,
         customWidgets: state.customWidgets,
-        isNavBarVisible: state.isNavBarVisible
+        isNavBarVisible: state.isNavBarVisible,
+        showBookmarksOnStartup: state.showBookmarksOnStartup,
+        bookmarkIconSize: state.bookmarkIconSize
       }),
     }
   )

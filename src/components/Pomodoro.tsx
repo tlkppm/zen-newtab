@@ -94,7 +94,9 @@ export const Pomodoro = () => {
 
   useEffect(() => {
       if (audioUrl) {
-          audioRef.current = new Audio(audioUrl);
+          const audio = new Audio(audioUrl);
+          audio.preload = 'auto';
+          audioRef.current = audio;
       }
   }, [audioUrl]);
 

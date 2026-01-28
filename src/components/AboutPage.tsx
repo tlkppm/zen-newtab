@@ -17,11 +17,26 @@ const AppIcon = () => (
 export const AboutPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('about');
   
-  const version = '1.0.4';
+  const version = '1.0.5';
   const buildDate = '2026-01-28';
   const repoUrl = 'https://github.com/tlkppm/zen-newtab';
 
   const changelog = [
+    {
+      version: '1.0.5',
+      date: '2026-01-28',
+      tag: `${repoUrl}/releases/tag/v1.0.5`,
+      changes: [
+        '新增开发者工具箱组件',
+        '新增白噪音专注组件',
+        '新增深呼吸放松组件',
+        '支持剪贴板自动识别分享码',
+        '新增默认随机背景图片',
+        '修复本地背景图片刷新后消失的问题',
+        '修复番茄钟提示音试听功能',
+        '修复 Monaco 编辑器 CSP 加载问题',
+      ]
+    },
     {
       version: '1.0.4',
       date: '2026-01-28',

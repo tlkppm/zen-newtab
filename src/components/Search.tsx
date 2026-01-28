@@ -273,57 +273,58 @@ export const Search = () => {
       {/* Dropdown Suggestions */}
       {showDropdown && (
           <div 
-            className="absolute top-full left-0 right-0 bg-zinc-900/90 backdrop-blur-md border border-t-0 border-white/20 rounded-b-3xl shadow-2xl overflow-hidden flex flex-col animate-fade-in max-h-[400px] overflow-y-auto custom-scrollbar z-[100]"
-            onContextMenu={(e) => e.preventDefault()} // Prevent default context menu
+            className="absolute top-full left-0 right-0 bg-zinc-900/95 backdrop-blur-xl border border-t-0 border-white/10 rounded-b-3xl shadow-2xl overflow-hidden flex flex-col animate-fade-in z-[100]"
+            onContextMenu={(e) => e.preventDefault()}
           >
-              
-              {/* Suggestions (Live) */}
-              {suggestions.length > 0 && (
-                  <div className="p-2 border-b border-white/5">
-                      {suggestions.map((item, idx) => (
-                          <div 
-                            key={`sug-${idx}`} 
-                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 rounded-lg cursor-pointer text-zinc-200 hover:text-white transition-colors"
-                            onClick={() => handleSearch({ preventDefault: () => {} } as any, item)}
-                          >
-                              <SearchIcon size={16} className="text-zinc-500 flex-shrink-0" />
-                              <span className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: item.replace(query, `<b>${query}</b>`) }}></span>
-                          </div>
-                      ))}
-                  </div>
-              )}
+              <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-2">
+                {/* Suggestions (Live) */}
+                {suggestions.length > 0 && (
+                    <div className="mb-2 border-b border-white/5 pb-2">
+                        {suggestions.map((item, idx) => (
+                            <div 
+                                key={`sug-${idx}`} 
+                                className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 rounded-xl cursor-pointer text-zinc-200 hover:text-white transition-colors"
+                                onClick={() => handleSearch({ preventDefault: () => {} } as any, item)}
+                            >
+                                <SearchIcon size={16} className="text-zinc-500 flex-shrink-0" />
+                                <span className="flex-1 truncate" dangerouslySetInnerHTML={{ __html: item.replace(query, `<b>${query}</b>`) }}></span>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
-              {/* Recent Searches (History) */}
-              {recentSearches.length > 0 && (
-                  <div className="p-2">
-                      <div className="px-4 py-2 text-xs text-zinc-500 font-medium flex justify-between items-center">
-                          <span>历史记录</span>
-                      </div>
-                      {recentSearches.map((item, idx) => (
-                          <div 
-                            key={`hist-${idx}`} 
-                            className="group flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 rounded-lg cursor-pointer text-zinc-400 hover:text-white transition-colors"
-                            onClick={() => handleSearch({ preventDefault: () => {} } as any, item)}
-                          >
-                              <Clock size={16} className="text-zinc-600 group-hover:text-zinc-400 flex-shrink-0" />
-                              <span className="flex-1 truncate">{item}</span>
-                              <button 
-                                onClick={(e) => deleteRecent(e, item)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded-full transition-all text-zinc-500 hover:text-white"
-                                title="从列表中移除"
-                              >
-                                  <X size={14} />
-                              </button>
-                          </div>
-                      ))}
-                  </div>
-              )}
+                {/* Recent Searches (History) */}
+                {recentSearches.length > 0 && (
+                    <div className="mb-2">
+                        <div className="px-4 py-2 text-xs text-zinc-500 font-medium flex justify-between items-center">
+                            <span>历史记录</span>
+                        </div>
+                        {recentSearches.map((item, idx) => (
+                            <div 
+                                key={`hist-${idx}`} 
+                                className="group flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 rounded-xl cursor-pointer text-zinc-400 hover:text-white transition-colors"
+                                onClick={() => handleSearch({ preventDefault: () => {} } as any, item)}
+                            >
+                                <Clock size={16} className="text-zinc-600 group-hover:text-zinc-400 flex-shrink-0" />
+                                <span className="flex-1 truncate">{item}</span>
+                                <button 
+                                    onClick={(e) => deleteRecent(e, item)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded-full transition-all text-zinc-500 hover:text-white"
+                                    title="从列表中移除"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+              </div>
               
-              <div className="p-2 border-t border-white/5 bg-black/20">
+              <div className="p-2 border-t border-white/5 bg-black/20 backdrop-blur-sm">
                   <a 
                     href="#" 
                     onClick={(e) => { e.preventDefault(); if (chrome.tabs) chrome.tabs.create({ url: 'chrome://history' }); }}
-                    className="block text-center text-xs text-blue-400 hover:text-blue-300 py-1"
+                    className="block text-center text-xs text-blue-400 hover:text-blue-300 py-1.5 font-medium transition-colors"
                   >
                       管理搜索历史记录
                   </a>

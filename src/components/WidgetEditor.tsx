@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Plus, Code, Eye, FileCode, Palette, Zap, GitBranch } from 'lucide-react';
-import Editor from '@monaco-editor/react';
+import Editor, { loader } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor';
 import { useStore, CustomWidget } from '../store/useStore';
 import { useToastStore } from '../store/useToastStore';
 import { BlueprintEditor } from './BlueprintEditor';
+
+// 配置 Monaco 使用本地加载器，避免 CSP 问题
+loader.config({ monaco });
 
 interface WidgetEditorProps {
   onClose: () => void;

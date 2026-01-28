@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Folder, ChevronRight, Home, ArrowLeft, FolderOpen } from 'lucide-react';
+import { useStore } from '../store/useStore';
 
 interface BookmarkNode {
   id: string;
@@ -19,6 +20,7 @@ export const Bookmarks = () => {
   const [displayNodes, setDisplayNodes] = useState<BookmarkNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const { bookmarkIconSize } = useStore();
 
   const loadFolderContents = (folderId: string) => {
     setIsLoading(true);
@@ -118,55 +120,85 @@ export const Bookmarks = () => {
 
   const isAtRoot = folderHistory.length === 0;
 
+  // Size configuration
+  const sizeConfig = {
+    small: { 
+      grid: 'grid-cols-[repeat(auto-fill,minmax(80px,1fr))]',
+      iconContainer: 'w-12 h-12 rounded-xl',
+      iconSize: 'w-6 h-6',
+      folderIconSize: 20,
+      gap: 'gap-4',
+      fontSize: 'text-[10px]'
+    },
+    medium: { 
+      grid: 'grid-cols-[repeat(auto-fill,minmax(100px,1fr))]',
+      iconContainer: 'w-16 h-16 rounded-2xl',
+      iconSize: 'w-8 h-8',
+      folderIconSize: 28,
+      gap: 'gap-6',
+      fontSize: 'text-xs'
+    },
+    large: { 
+      grid: 'grid-cols-[repeat(auto-fill,minmax(120px,1fr))]',
+      iconContainer: 'w-20 h-20 rounded-2xl',
+      iconSize: 'w-10 h-10',
+      folderIconSize: 36,
+      gap: 'gap-8',
+      fontSize: 'text-sm'
+    }
+  };
+
+  const currentSize = sizeConfig[bookmarkIconSize || 'medium'];
+
   return (
-    <div className="w-full h-full p-2 transition-all duration-300 overflow-y-auto custom-scrollbar">
-       <div className="flex items-center justify-between mb-2">
-         <div className="flex items-center gap-2">
+    <div className="w-full h-full p-6 transition-all duration-300 overflow-y-auto custom-scrollbar">
+       <div className="flex items-center justify-between mb-8">
+         <div className="flex items-center gap-3">
              {/* Back Button */}
              {!isAtRoot && (
                  <button 
                     onClick={handleBack}
-                    className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors mr-1"
+                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors backdrop-blur-md"
                     title="返回上一级"
                 >
-                     <ArrowLeft size={14} />
+                     <ArrowLeft size={18} />
                  </button>
              )}
              
-             {/* Title / Breadcrumb */}
-             <div className="flex items-center text-white/90 text-sm font-medium backdrop-blur-sm px-2 py-1 rounded-lg bg-white/5 border border-white/10">
-                {isAtRoot ? <Home size={14} className="mr-1" /> : <FolderOpen size={14} className="mr-1 text-yellow-400" />}
-                <span className="truncate max-w-[150px]">{currentFolderTitle}</span>
+             {/* Title / Breadcrumb Pill */}
+             <div className="flex items-center text-white/90 text-sm font-medium backdrop-blur-md px-4 py-2 rounded-full bg-white/10 border border-white/10 shadow-lg">
+                {isAtRoot ? <Home size={16} className="mr-2" /> : <FolderOpen size={16} className="mr-2 text-yellow-400" />}
+                <span className="truncate max-w-[200px]">{currentFolderTitle}</span>
              </div>
          </div>
        </div>
        
        {/* Loading State */}
        {isLoading && (
-           <div className="flex items-center justify-center py-10 text-white/50">
-               <div className="animate-spin w-6 h-6 border-2 border-white/20 border-t-white rounded-full mr-3"></div>
+           <div className="flex items-center justify-center py-20 text-white/50">
+               <div className="animate-spin w-8 h-8 border-2 border-white/20 border-t-white rounded-full mr-3"></div>
                <span className="text-sm">加载中...</span>
            </div>
        )}
        
        {/* Main Grid Area */}
-       {!isLoading && <div className="grid grid-cols-[repeat(auto-fill,minmax(70px,1fr))] gap-2 animate-fade-in">
+       {!isLoading && <div className={`grid ${currentSize.grid} ${currentSize.gap} animate-fade-in pb-10`}>
          {displayNodes.map(node => {
              if (node.url) {
                  return (
                     <a 
                         key={node.id} 
                         href={node.url} 
-                        className="group flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all hover:scale-105 duration-200 relative"
+                        className="group flex flex-col items-center gap-3 transition-all hover:-translate-y-1 duration-300"
                         title={node.title + '\n' + node.url}
                     >
-                        <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg group-hover:bg-white/30 transition-colors">
+                        <div className={`${currentSize.iconContainer} bg-white/10 backdrop-blur-md flex items-center justify-center shadow-lg group-hover:bg-white/20 group-hover:shadow-xl transition-all border border-white/5 group-hover:border-white/20`}>
                              <img 
                                 src={typeof chrome !== 'undefined' && chrome.runtime 
                                     ? `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(node.url)}&size=32`
                                     : `https://favicon.im/${new URL(node.url).hostname}`}
                                 alt={node.title} 
-                                className="w-6 h-6 rounded-sm"
+                                className={`${currentSize.iconSize} rounded-sm`}
                                 onError={(e) => { 
                                     const img = e.target as HTMLImageElement;
                                     if (!img.dataset.fallback) {
@@ -178,7 +210,7 @@ export const Bookmarks = () => {
                                 }} 
                              />
                         </div>
-                        <span className="text-white/80 text-xs truncate w-full text-center group-hover:text-white">{node.title}</span>
+                        <span className={`text-white/70 ${currentSize.fontSize} truncate w-full text-center group-hover:text-white transition-colors px-1`}>{node.title}</span>
                     </a>
                  );
              } else {
@@ -187,13 +219,13 @@ export const Bookmarks = () => {
                     <div 
                         key={node.id} 
                         onClick={() => handleFolderClick(node)}
-                        className="group flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all cursor-pointer hover:scale-105 duration-200"
+                        className="group flex flex-col items-center gap-3 cursor-pointer transition-all hover:-translate-y-1 duration-300"
                         title={`进入文件夹: ${node.title}`}
                     >
-                        <div className="w-10 h-10 bg-yellow-500/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg group-hover:bg-yellow-500/30 transition-colors border border-yellow-500/30">
-                            <Folder size={20} className="text-yellow-200 group-hover:text-yellow-100" />
+                        <div className={`${currentSize.iconContainer} bg-yellow-500/10 backdrop-blur-md flex items-center justify-center shadow-lg group-hover:bg-yellow-500/20 group-hover:shadow-xl transition-all border border-yellow-500/20 group-hover:border-yellow-500/40`}>
+                            <Folder size={currentSize.folderIconSize} className="text-yellow-400 group-hover:text-yellow-300" />
                         </div>
-                        <span className="text-white/80 text-xs truncate w-full text-center group-hover:text-white font-medium">{node.title}</span>
+                        <span className={`text-white/70 ${currentSize.fontSize} truncate w-full text-center group-hover:text-white font-medium px-1`}>{node.title}</span>
                     </div>
                  );
              }
