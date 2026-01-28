@@ -162,10 +162,20 @@ export const Bookmarks = () => {
                     >
                         <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg group-hover:bg-white/30 transition-colors">
                              <img 
-                                src={`https://www.google.com/s2/favicons?sz=64&domain_url=${node.url}`}
+                                src={typeof chrome !== 'undefined' && chrome.runtime 
+                                    ? `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(node.url)}&size=32`
+                                    : `https://favicon.im/${new URL(node.url).hostname}`}
                                 alt={node.title} 
                                 className="w-6 h-6 rounded-sm"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} 
+                                onError={(e) => { 
+                                    const img = e.target as HTMLImageElement;
+                                    if (!img.dataset.fallback) {
+                                        img.dataset.fallback = '1';
+                                        img.src = `https://favicon.im/${new URL(node.url).hostname}`;
+                                    } else {
+                                        img.style.display = 'none';
+                                    }
+                                }} 
                              />
                         </div>
                         <span className="text-white/80 text-xs truncate w-full text-center group-hover:text-white">{node.title}</span>
