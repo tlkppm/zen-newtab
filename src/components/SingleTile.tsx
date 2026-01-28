@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Trash2, Edit2 } from 'lucide-react';
 import { useStore, Tile } from '../store/useStore';
+import { useToastStore } from '../store/useToastStore';
 import * as Icons from 'lucide-react';
 import { getTileImage, deleteTileImage } from '../lib/db';
 import { TileEditor } from './TileEditor';
@@ -12,6 +13,7 @@ interface SingleTileProps {
 
 export const SingleTile = ({ tile, isEditing }: SingleTileProps) => {
   const { removeTile, updateTile } = useStore();
+  const { confirm, addToast } = useToastStore();
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
@@ -28,11 +30,12 @@ export const SingleTile = ({ tile, isEditing }: SingleTileProps) => {
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (confirm('确定要删除这个磁贴吗？')) {
+    if (await confirm('确定要删除这个磁贴吗？')) {
       removeTile(tile.id);
       if (tile.bgImage) {
         await deleteTileImage(tile.bgImage);
       }
+      addToast({ type: 'success', message: '磁贴已删除' });
     }
   };
 
@@ -45,6 +48,7 @@ export const SingleTile = ({ tile, isEditing }: SingleTileProps) => {
   const handleSave = (updatedTile: Tile) => {
       updateTile(tile.id, updatedTile);
       setIsEditorOpen(false);
+      addToast({ type: 'success', message: '磁贴已更新' });
   };
 
   const getIcon = (iconName: string) => {

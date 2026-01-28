@@ -27,6 +27,16 @@ export interface Tile {
 export type BackgroundType = 'image' | 'video';
 export type SearchEngine = 'google' | 'bing' | 'baidu';
 
+export interface CustomWidget {
+  id: string;
+  name: string;
+  html: string;
+  css: string;
+  js: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 interface LayoutItem {
   id?: string;
   x: number;
@@ -76,6 +86,14 @@ interface AppState {
   resetLayout: () => void;
   exportLayout: () => string;
   importLayout: (code: string) => boolean;
+
+  customWidgets: CustomWidget[];
+  addCustomWidget: (widget: CustomWidget) => void;
+  updateCustomWidget: (id: string, updates: Partial<CustomWidget>) => void;
+  removeCustomWidget: (id: string) => void;
+
+  isNavBarVisible: boolean;
+  toggleNavBar: () => void;
 }
 
 const DEFAULT_LAYOUT = {
@@ -188,6 +206,36 @@ export const useStore = create<AppState>()(
 
           return { layout: newLayout };
       }),
+
+      customWidgets: [],
+      addCustomWidget: (widget) => set((state) => {
+          const widgetLayoutId = `widget_${widget.id}`;
+          return {
+              customWidgets: [...state.customWidgets, widget],
+              layout: {
+                  ...state.layout,
+                  [widgetLayoutId]: { id: widgetLayoutId, x: 0, y: 0, w: 200, h: 150, visible: true }
+              }
+          };
+      }),
+
+      isNavBarVisible: true,
+      toggleNavBar: () => set((state) => ({ isNavBarVisible: !state.isNavBarVisible })),
+
+      updateCustomWidget: (id, updates) => set((state) => ({
+          customWidgets: state.customWidgets.map(w => 
+              w.id === id ? { ...w, ...updates, updatedAt: Date.now() } : w
+          )
+      })),
+      removeCustomWidget: (id) => set((state) => {
+          const newLayout = { ...state.layout };
+          delete newLayout[`widget_${id}`];
+          return {
+              customWidgets: state.customWidgets.filter(w => w.id !== id),
+              layout: newLayout
+          };
+      }),
+
       exportLayout: () => {
           const state = get();
           const keyMap: Record<string, string> = {
@@ -205,12 +253,19 @@ export const useStore = create<AppState>()(
               `${t.id}|${t.title || ''}|${t.url}|${t.color.replace('bg-', '')}|${t.icon}`
           ).join(';');
           
+          const widgetsCompact = state.customWidgets.map(w => 
+              btoa(unescape(encodeURIComponent(JSON.stringify({
+                  id: w.id, name: w.name, html: w.html, css: w.css, js: w.js
+              }))))
+          ).join(';');
+          
           const parts = [
-              '2',
+              '3',
               state.searchEngine[0],
               state.showSeconds ? '1' : '0',
               Object.entries(compact).map(([k, v]) => `${k}:${v}`).join('|'),
-              tilesCompact
+              tilesCompact,
+              widgetsCompact
           ];
           
           const data = parts.join('~');
@@ -245,7 +300,8 @@ export const useStore = create<AppState>()(
               const padded = compressed.replace(/-/g, '+').replace(/_/g, '/');
               const data = decodeURIComponent(escape(atob(padded)));
               const parts = data.split('~');
-              if (parts[0] !== '2') return false;
+              const version = parts[0];
+              if (version !== '2' && version !== '3') return false;
               
               const keyMap: Record<string, string> = {
                   c: 'clock', s: 'search', h: 'shortcuts', m: 'mediaPlayer',
@@ -267,11 +323,18 @@ export const useStore = create<AppState>()(
                   return { id, title: title || undefined, url, color: `bg-${color}`, icon };
               }) : [];
               
+              const customWidgets: CustomWidget[] = (version === '3' && parts[5]) 
+                  ? parts[5].split(';').filter(Boolean).map(w => {
+                      const parsed = JSON.parse(decodeURIComponent(escape(atob(w))));
+                      return { ...parsed, createdAt: Date.now(), updatedAt: Date.now() };
+                  }) : [];
+              
               set({
                   layout,
                   searchEngine: engines[parts[1]] || 'google',
                   showSeconds: parts[2] === '1',
-                  tiles
+                  tiles,
+                  customWidgets
               });
               return true;
           } catch {
@@ -290,7 +353,9 @@ export const useStore = create<AppState>()(
         showSeconds: state.showSeconds,
         shortcuts: state.shortcuts,
         tiles: state.tiles,
-        layout: state.layout
+        layout: state.layout,
+        customWidgets: state.customWidgets,
+        isNavBarVisible: state.isNavBarVisible
       }),
     }
   )

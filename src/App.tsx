@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, Upload, Clock as ClockIcon, Book, History, Terminal, Puzzle, Move, RotateCcw, MonitorPlay, Eye, EyeOff, Scaling, Cloud, Quote as QuoteIcon, Calendar, Plus, Grid, Info, Home } from 'lucide-react';
+import { Settings, Upload, Clock as ClockIcon, Book, History, Terminal, Puzzle, Move, RotateCcw, MonitorPlay, Eye, EyeOff, Scaling, Cloud, Quote as QuoteIcon, Calendar, Plus, Grid, Info, Home, Code, Search as SearchIcon, Star, CheckSquare, StickyNote, Timer, Music, CalendarDays, Menu } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { Background } from './components/Background';
 import { Clock, DateWidget } from './components/Clock';
@@ -20,7 +20,9 @@ import { Tiles, SingleTile, TileEditor } from './components/Tiles';
 import { PhotoGridGenerator } from './components/PhotoGridGenerator';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdateNotification } from './components/UpdateNotification';
+import { WidgetEditor, CustomWidgetRenderer } from './components/WidgetEditor';
 import { saveVideoToDB, clearVideoFromDB, saveImageToDB, getImageFromDB, getVideoFromDB, clearImageFromDB } from './lib/db';
+import { ToastContainer } from './components/Toast';
 
 type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions' | 'about';
 
@@ -230,7 +232,10 @@ function App() {
     exportLayout,
     importLayout,
     tiles,
-    addTile
+    addTile,
+    customWidgets,
+    isNavBarVisible,
+    toggleNavBar
   } = useStore();
   
   // ... existing state ...
@@ -245,6 +250,7 @@ function App() {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTileEditorOpen, setIsTileEditorOpen] = useState(false);
   const [isPhotoGridOpen, setIsPhotoGridOpen] = useState(false);
+  const [isWidgetEditorOpen, setIsWidgetEditorOpen] = useState(false);
 
   // Drag state for alignment guides
   const [dragBounds, setDragBounds] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
@@ -486,7 +492,7 @@ function App() {
       )}
 
       {/* Top Navigation Bar */}
-      <nav className={`absolute top-0 left-0 right-0 p-6 flex justify-between items-start z-50 pointer-events-none transition-opacity ${isEditingLayout ? 'opacity-0' : 'opacity-100'}`}>
+      <nav className={`absolute top-0 left-0 right-0 p-6 flex justify-between items-start z-50 transition-all duration-300 ${isEditingLayout || !isNavBarVisible ? 'opacity-0 -translate-y-4 pointer-events-none invisible' : 'opacity-100 translate-y-0 visible'}`}>
           {/* Left: View Switcher */}
           <div className="flex flex-col gap-4 pointer-events-auto">
               <div className="flex items-center gap-1 bg-black/20 backdrop-blur-md p-1 rounded-full border border-white/10">
@@ -546,75 +552,96 @@ function App() {
       {contextMenu && (
         <div 
             style={{ top: contextMenu.y, left: contextMenu.x }}
-            className="fixed bg-zinc-900/90 border border-white/10 rounded-lg shadow-2xl py-1 z-[9999] min-w-[180px] backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+            className="fixed bg-zinc-900/95 border border-white/10 rounded-xl shadow-2xl py-2 z-[9999] min-w-[220px] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
             onClick={(e) => e.stopPropagation()}
         >
+            <div className="px-2 pb-2">
+                <div className="grid grid-cols-4 gap-1">
+                    {Object.entries({
+                        clock: { label: '时钟', icon: <ClockIcon size={18} /> },
+                        date: { label: '日期', icon: <CalendarDays size={18} /> },
+                        calendar: { label: '日历', icon: <Calendar size={18} /> },
+                        search: { label: '搜索', icon: <SearchIcon size={18} /> },
+                        shortcuts: { label: '收藏', icon: <Star size={18} /> },
+                        weather: { label: '天气', icon: <Cloud size={18} /> },
+                        quote: { label: '语录', icon: <QuoteIcon size={18} /> },
+                        todo: { label: '待办', icon: <CheckSquare size={18} /> },
+                        memo: { label: '便签', icon: <StickyNote size={18} /> },
+                        pomodoro: { label: '番茄', icon: <Timer size={18} /> },
+                        mediaPlayer: { label: '音乐', icon: <Music size={18} /> },
+                    }).map(([key, { label, icon }]) => (
+                        <button
+                            key={key}
+                            onClick={() => { toggleVisibility(key); }}
+                            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl text-xs transition-all ${
+                                // @ts-ignore
+                                layout[key]?.visible 
+                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+                                    : 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
+                            }`}
+                            title={label}
+                        >
+                            <span className="opacity-90">{icon}</span>
+                            <span className="truncate w-full text-center text-[10px] font-medium opacity-80">{label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="border-t border-white/10 my-1" />
+
+            <button 
+                onClick={() => { toggleNavBar(); setContextMenu(null); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 flex items-center gap-2"
+            >
+                {isNavBarVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                {isNavBarVisible ? '隐藏菜单栏' : '显示菜单栏'}
+            </button>
+
             <button 
                 onClick={() => { setIsEditingLayout(!isEditingLayout); setContextMenu(null); }}
-                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 flex items-center gap-2"
             >
                 <Move size={14} />
-                {isEditingLayout ? '退出布局编辑' : '编辑当前布局'}
+                {isEditingLayout ? '退出编辑' : '编辑布局'}
             </button>
-            
-            <div className="border-t border-white/5 my-1" />
-            <div className="px-4 py-1 text-xs text-white/40 font-medium">组件显示</div>
-            
-            {Object.entries({
-                clock: '时钟',
-                date: '日期',
-                calendar: '日历',
-                search: '搜索栏',
-                shortcuts: '收藏夹',
-                mediaPlayer: '媒体播放器',
-                weather: '天气',
-                quote: '每日一言',
-                todo: '待办事项',
-                memo: '便签',
-                pomodoro: '番茄钟'
-            }).map(([key, label]) => (
-                <button
-                    key={key}
-                    // @ts-ignore
-                    onClick={() => { toggleVisibility(key); }}
-                    className="w-full text-left px-4 py-1.5 text-sm text-white hover:bg-white/10 flex items-center gap-2"
-                >
-                    {/* @ts-ignore */}
-                    {layout[key]?.visible ? <Eye size={14} className="text-blue-400" /> : <EyeOff size={14} className="text-zinc-500" />}
-                    {/* @ts-ignore */}
-                    <span className={layout[key]?.visible ? 'text-white' : 'text-zinc-500'}>{label}</span>
-                </button>
-            ))}
 
-            <div className="border-t border-white/5 my-1" />
+            <div className="border-t border-white/10 my-1" />
 
             <button 
                 onClick={() => { setIsTileEditorOpen(true); setContextMenu(null); }}
-                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 flex items-center gap-2"
             >
                 <Plus size={14} />
-                添加独立磁贴
+                添加磁贴
             </button>
             <button 
                 onClick={() => { setIsPhotoGridOpen(true); setContextMenu(null); }}
-                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 flex items-center gap-2"
             >
                 <Grid size={14} />
-                添加图片拼图
+                图片拼图
+            </button>
+            <button 
+                onClick={() => { setIsWidgetEditorOpen(true); setContextMenu(null); }}
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 flex items-center gap-2"
+            >
+                <Code size={14} />
+                自定义组件
             </button>
 
-            <div className="border-t border-white/5 my-1" />
+            <div className="border-t border-white/10 my-1" />
 
             <button 
                 onClick={() => { setIsSettingsOpen(true); setContextMenu(null); }}
-                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 flex items-center gap-2"
             >
                 <Settings size={14} />
                 页面设置
             </button>
             <button 
                 onClick={() => { resetLayout(); setContextMenu(null); }}
-                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 flex items-center gap-2"
             >
                 <RotateCcw size={14} />
                 重置布局
@@ -878,6 +905,33 @@ function App() {
                          </ResizableDraggable>
                      );
                  })}
+
+                 {/* Custom Widgets */}
+                 {customWidgets.map(widget => {
+                     const layoutId = `widget_${widget.id}`;
+                     const widgetLayout = layout[layoutId];
+                     if (!widgetLayout) return null;
+
+                     return (
+                         <ResizableDraggable
+                            key={widget.id}
+                            id={layoutId}
+                            x={widgetLayout.x}
+                            y={widgetLayout.y}
+                            w={widgetLayout.w}
+                            h={widgetLayout.h}
+                            onUpdate={handleUpdate}
+                            isEditing={isEditingLayout}
+                            visible={widgetLayout.visible}
+                            onDragState={handleDragState}
+                            allBounds={getAllBounds()}
+                         >
+                             <div className="w-full h-full bg-black/20 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden">
+                                 <CustomWidgetRenderer widget={widget} />
+                             </div>
+                         </ResizableDraggable>
+                     );
+                 })}
              </div>
         </div>
 
@@ -942,6 +996,11 @@ function App() {
                 });
             }}
         />
+
+        {/* Widget Editor Modal */}
+        {isWidgetEditorOpen && (
+            <WidgetEditor onClose={() => setIsWidgetEditorOpen(false)} />
+        )}
 
         {/* Bookmarks View */}
         <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'bookmarks' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
@@ -1237,6 +1296,7 @@ function App() {
       
       {/* Update Notification */}
       <UpdateNotification />
+      <ToastContainer />
     </div>
   );
 }
