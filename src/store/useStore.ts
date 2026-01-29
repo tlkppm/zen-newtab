@@ -100,6 +100,27 @@ interface AppState {
 
   bookmarkIconSize: 'small' | 'medium' | 'large';
   setBookmarkIconSize: (size: 'small' | 'medium' | 'large') => void;
+
+  // Nav Bar Customization
+  navBarConfig: {
+    position: 'top' | 'bottom' | 'floating';
+    style: 'glass' | 'solid' | 'transparent';
+    x?: number; // for floating
+    y?: number; // for floating
+  };
+  setNavBarConfig: (config: Partial<AppState['navBarConfig']>) => void;
+
+  // Birthday System
+  birthday: string | null; // MM-DD
+  setBirthday: (date: string | null) => void;
+  isBirthdayMode: boolean;
+  setIsBirthdayMode: (isBirthday: boolean) => void;
+  generatedBirthdayImage: string | null;
+  setGeneratedBirthdayImage: (url: string | null) => void;
+  lastGreetingDate: string | null; // YYYY-MM-DD
+  setLastGreetingDate: (date: string | null) => void;
+  preBirthdayBackground: { image: string; source: 'url' | 'local' } | null;
+  setPreBirthdayBackground: (bg: { image: string; source: 'url' | 'local' } | null) => void;
 }
 
 const DEFAULT_LAYOUT = {
@@ -236,6 +257,20 @@ export const useStore = create<AppState>()(
 
       bookmarkIconSize: 'medium',
       setBookmarkIconSize: (size) => set({ bookmarkIconSize: size }),
+
+      navBarConfig: { position: 'top', style: 'glass' },
+      setNavBarConfig: (config) => set((state) => ({ navBarConfig: { ...state.navBarConfig, ...config } })),
+
+      birthday: null,
+      setBirthday: (date) => set({ birthday: date }),
+      isBirthdayMode: false,
+      setIsBirthdayMode: (mode) => set({ isBirthdayMode: mode }),
+      generatedBirthdayImage: null,
+      setGeneratedBirthdayImage: (url) => set({ generatedBirthdayImage: url }),
+      lastGreetingDate: null,
+      setLastGreetingDate: (date) => set({ lastGreetingDate: date }),
+      preBirthdayBackground: null,
+      setPreBirthdayBackground: (bg) => set({ preBirthdayBackground: bg }),
 
       updateCustomWidget: (id, updates) => set((state) => ({
           customWidgets: state.customWidgets.map(w => 
@@ -374,7 +409,11 @@ export const useStore = create<AppState>()(
         customWidgets: state.customWidgets,
         isNavBarVisible: state.isNavBarVisible,
         showBookmarksOnStartup: state.showBookmarksOnStartup,
-        bookmarkIconSize: state.bookmarkIconSize
+        bookmarkIconSize: state.bookmarkIconSize,
+        navBarConfig: state.navBarConfig,
+        birthday: state.birthday,
+        lastGreetingDate: state.lastGreetingDate,
+        generatedBirthdayImage: state.generatedBirthdayImage
       }),
     }
   )

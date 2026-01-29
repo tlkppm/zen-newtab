@@ -26,7 +26,11 @@ import { UpdateNotification } from './components/UpdateNotification';
 import { WidgetEditor, CustomWidgetRenderer } from './components/WidgetEditor';
 import { saveVideoToDB, clearVideoFromDB, saveImageToDB, getImageFromDB, getVideoFromDB, clearImageFromDB } from './lib/db';
 import { ToastContainer } from './components/Toast';
+import { useToastStore } from './store/useToastStore';
 import { SettingsModal } from './components/SettingsModal';
+import { BirthdaySetupModal } from './components/BirthdaySetupModal';
+import { BirthdayGreeting } from './components/BirthdayGreeting';
+import dayjs from 'dayjs';
 
 type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions' | 'about';
 
@@ -218,10 +222,12 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('home');
   const [isEditingLayout, setIsEditingLayout] = useState(false);
+  const [showBirthdayGreeting, setShowBirthdayGreeting] = useState(false);
   
   const { 
     showSeconds, 
     toggleShowSeconds, 
+    backgroundImage,
     setBackgroundImage, 
     backgroundType, 
     setBackgroundType, 
@@ -243,15 +249,152 @@ function App() {
     showBookmarksOnStartup,
     toggleShowBookmarksOnStartup,
     bookmarkIconSize,
-    setBookmarkIconSize
+    setBookmarkIconSize,
+    navBarConfig,
+    setNavBarConfig,
+    birthday,
+    setBirthday,
+    isBirthdayMode,
+    setIsBirthdayMode,
+    generatedBirthdayImage,
+    setGeneratedBirthdayImage,
+    preBirthdayBackground,
+    setPreBirthdayBackground,
+    lastGreetingDate,
+    setLastGreetingDate
   } = useStore();
+  const { addToast } = useToastStore();
   
   // Initialize view mode based on settings
   useEffect(() => {
     if (showBookmarksOnStartup) {
       setViewMode('bookmarks');
     }
-  }, []);
+    
+    // Birthday Check
+    if (birthday && birthday !== 'skip') {
+        const today = dayjs().format('MM-DD');
+        const todayFull = dayjs().format('YYYY-MM-DD');
+
+        if (birthday === today) {
+            // Check if we should show greeting on mount/update
+            if (!isBirthdayMode) {
+                setPreBirthdayBackground({ image: backgroundImage, source: backgroundImageSource });
+                setIsBirthdayMode(true);
+                
+                // Only show greeting if it hasn't been shown today
+                if (lastGreetingDate !== todayFull) {
+                    setShowBirthdayGreeting(true);
+                }
+                
+                if (!generatedBirthdayImage) {
+                    const prompt = "warm birthday party atmosphere, birthday cake with candles, colorful balloons, soft golden lighting, cozy living room, photorealistic, 8k resolution, cinematic composition, celebrating life, no text";
+                    const url = `https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=${encodeURIComponent(prompt)}&image_size=landscape_16_9`;
+                    setGeneratedBirthdayImage(url);
+                    setBackgroundImage(url);
+                    addToast({ type: 'info', message: '正在为您生成专属生日背景...' });
+                } else {
+                    setBackgroundImage(generatedBirthdayImage);
+                }
+            }
+        } else {
+            if (isBirthdayMode) {
+                setIsBirthdayMode(false);
+                if (preBirthdayBackground) {
+                    if (preBirthdayBackground.source === 'local') {
+                        useStore.getState().applyLocalImage();
+                    } else {
+                        setBackgroundImage(preBirthdayBackground.image);
+                    }
+                    setPreBirthdayBackground(null);
+                }
+            }
+        }
+    } else {
+        if (isBirthdayMode) {
+            setIsBirthdayMode(false);
+            if (preBirthdayBackground) {
+                if (preBirthdayBackground.source === 'local') {
+                    useStore.getState().applyLocalImage();
+                } else {
+                    setBackgroundImage(preBirthdayBackground.image);
+                }
+                setPreBirthdayBackground(null);
+            }
+        }
+    }
+  }, [birthday, isBirthdayMode, generatedBirthdayImage, preBirthdayBackground, backgroundImage, backgroundImageSource, lastGreetingDate]);
+
+  // Navbar Drag Logic
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!isEditingLayout || navBarConfig.position !== 'floating') return;
+    const el = navRef.current;
+    if (!el) return;
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let initX = navBarConfig.x || 100;
+    let initY = navBarConfig.y || 100;
+
+    const handleDown = (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        el.style.cursor = 'grabbing';
+    };
+
+    const handleMove = (e: MouseEvent) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        el.style.transform = `translate(${initX + dx}px, ${initY + dy}px)`;
+    };
+
+    const handleUp = (e: MouseEvent) => {
+        if (!isDragging) return;
+        isDragging = false;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        setNavBarConfig({ x: initX + dx, y: initY + dy });
+        el.style.cursor = 'grab';
+    };
+
+    el.addEventListener('mousedown', handleDown);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+        el.removeEventListener('mousedown', handleDown);
+        window.removeEventListener('mousemove', handleMove);
+        window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isEditingLayout, navBarConfig]);
+
+  // Navbar Style Classes
+  const getNavStyle = () => {
+      const base = "flex items-center gap-1 p-1 rounded-full transition-all duration-300";
+      switch (navBarConfig.style) {
+          case 'solid': return `${base} bg-zinc-900 border border-zinc-800`;
+          case 'transparent': return `${base} bg-transparent`;
+          default: return `${base} bg-black/20 backdrop-blur-md border border-white/10`;
+      }
+  };
+
+  const getNavPosition = () => {
+      if (navBarConfig.position === 'floating') {
+          return { 
+              position: 'fixed' as const, 
+              left: 0, 
+              top: 0, 
+              transform: `translate(${navBarConfig.x || 100}px, ${navBarConfig.y || 100}px)` 
+          };
+      }
+      if (navBarConfig.position === 'bottom') {
+          return { position: 'absolute' as const, bottom: 0, left: 0, right: 0, padding: '1.5rem', display: 'flex', justifyContent: 'center' };
+      }
+      return { position: 'absolute' as const, top: 0, left: 0, right: 0, padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
+  };
   
   // ... existing state ...
   const [bgUrlInput, setBgUrlInput] = useState('');
@@ -553,10 +696,14 @@ function App() {
       )}
 
       {/* Top Navigation Bar */}
-      <nav className={`absolute top-0 left-0 right-0 p-6 flex justify-between items-start z-50 transition-all duration-300 ${isEditingLayout || !isNavBarVisible ? 'opacity-0 -translate-y-4 pointer-events-none invisible' : 'opacity-100 translate-y-0 visible'}`}>
+      <nav 
+        ref={navRef}
+        style={getNavPosition()}
+        className={`z-50 transition-all duration-300 ${isEditingLayout || !isNavBarVisible ? (isEditingLayout ? 'visible opacity-100 cursor-move' : 'opacity-0 -translate-y-4 pointer-events-none invisible') : 'opacity-100 translate-y-0 visible'}`}
+      >
           {/* Left: View Switcher */}
           <div className="flex flex-col gap-4 pointer-events-auto">
-              <div className="flex items-center gap-1 bg-black/20 backdrop-blur-md p-1 rounded-full border border-white/10">
+              <div className={getNavStyle()}>
                   <button 
                     onClick={() => setViewMode('home')}
                     className={`p-2 rounded-full transition-all ${viewMode === 'home' ? 'bg-white text-black shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
@@ -601,13 +748,17 @@ function App() {
                   </button>
               </div>
           </div>
-          
-          {/* Right: Settings (Bottom-Right originally, moved to keep layout clean or keep at bottom?) 
-              Let's keep settings at bottom left, but we have nav at top left.
-              Let's move Settings to Top Right for symmetry? Or keep it bottom left.
-              User didn't specify. I'll keep Settings at bottom left.
-          */}
       </nav>
+
+      <BirthdaySetupModal />
+      
+      {/* Birthday Greeting */}
+      {showBirthdayGreeting && (
+        <BirthdayGreeting onDismiss={() => {
+            setShowBirthdayGreeting(false);
+            setLastGreetingDate(dayjs().format('YYYY-MM-DD'));
+        }} />
+      )}
 
       {/* Context Menu */}
       {contextMenu && (
@@ -1182,7 +1333,8 @@ function App() {
       {/* Settings Modal */}
       <SettingsModal 
         isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
+        onClose={() => setIsSettingsOpen(false)}
+        onPreviewBirthday={() => setShowBirthdayGreeting(true)}
       />
       
       {/* Update Notification */}

@@ -17,11 +17,23 @@ const AppIcon = () => (
 export const AboutPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('about');
   
-  const version = '1.0.5';
-  const buildDate = '2026-01-28';
+  const version = '1.0.6';
+  const buildDate = '2026-01-29';
   const repoUrl = 'https://github.com/tlkppm/zen-newtab';
 
   const changelog = [
+    {
+      version: '1.0.6',
+      date: '2026-01-29',
+      tag: `${repoUrl}/releases/tag/v1.0.6`,
+      changes: [
+        '新增生日祝福功能，支持设置生日日期',
+        '生日当天自动显示动态祝福动画（五彩纸屑、气球效果）',
+        '生日祝福支持背景音乐播放',
+        '新增生日预览功能，可在设置中预览祝福效果',
+        '修复生日设置弹窗逻辑问题',
+      ]
+    },
     {
       version: '1.0.5',
       date: '2026-01-28',

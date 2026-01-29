@@ -9,7 +9,7 @@ const UNSPLASH_COLLECTIONS = [
 ];
 
 export const Background = () => {
-  const { backgroundType, backgroundImage, videoTimestamp, backgroundImageSource, imageTimestamp } = useStore();
+  const { backgroundType, backgroundImage, videoTimestamp, backgroundImageSource, imageTimestamp, isBirthdayMode } = useStore();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [localImageUrl, setLocalImageUrl] = useState<string | null>(null);
   const [randomBgUrl, setRandomBgUrl] = useState<string | null>(null);
@@ -50,22 +50,34 @@ export const Background = () => {
 
   return (
     <div className="fixed inset-0 -z-10 bg-black overflow-hidden h-screen w-screen">
-      {backgroundType === 'image' && displayImageUrl && (
-        <img
-          src={displayImageUrl}
-          alt="Background"
-          className="w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-        />
-      )}
-      
-      {backgroundType === 'video' && videoUrl && (
+      {isBirthdayMode ? (
         <video
-            src={videoUrl}
+            src="/birthday-video.mp4"
             autoPlay
             muted
             loop
             className="w-full h-full object-cover"
         />
+      ) : (
+        <>
+            {backgroundType === 'image' && displayImageUrl && (
+                <img
+                src={displayImageUrl}
+                alt="Background"
+                className="w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                />
+            )}
+            
+            {backgroundType === 'video' && videoUrl && (
+                <video
+                    src={videoUrl}
+                    autoPlay
+                    muted
+                    loop
+                    className="w-full h-full object-cover"
+                />
+            )}
+        </>
       )}
 
       {/* Overlay for readability */}

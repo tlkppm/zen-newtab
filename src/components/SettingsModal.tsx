@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   X, Search, Monitor, Image as ImageIcon, Video, Upload, 
   Link, Clock, Layout, Share2, Download, UploadCloud,
@@ -12,11 +12,12 @@ import { useToastStore } from '../store/useToastStore';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onPreviewBirthday?: () => void;
 }
 
 type SettingsTab = 'general' | 'appearance' | 'background' | 'data';
 
-export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
+export const SettingsModal = ({ isOpen, onClose, onPreviewBirthday }: SettingsModalProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -24,6 +25,8 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     showSeconds, toggleShowSeconds,
     showBookmarksOnStartup, toggleShowBookmarksOnStartup,
     bookmarkIconSize, setBookmarkIconSize,
+    navBarConfig, setNavBarConfig,
+    birthday, setBirthday,
     searchEngine, setSearchEngine,
     backgroundType, setBackgroundType,
     backgroundImageSource,
@@ -40,6 +43,17 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [shareCode, setShareCode] = useState('');
   const [importCode, setImportCode] = useState('');
 
+  useEffect(() => {
+    if (isOpen) {
+      getImageFromDB().then(url => {
+        if (url) setLocalImagePreview(url);
+      });
+      getVideoFromDB().then(url => {
+        if (url) setLocalVideoPreview(url);
+      });
+    }
+  }, [isOpen]);
+
   // Group settings for search
   const settingsGroups = useMemo(() => {
     return [
@@ -50,6 +64,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         items: [
           { id: 'search-engine', label: '搜索引擎', keywords: ['google', 'bing', 'baidu', 'search'] },
           { id: 'startup', label: '启动设置', keywords: ['startup', 'bookmark', 'open'] },
+          { id: 'birthday', label: '生日设置', keywords: ['birthday', 'date', 'party'] },
         ]
       },
       {
@@ -57,6 +72,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         icon: <Palette size={18} />,
         label: '外观',
         items: [
+          { id: 'navbar', label: '菜单栏', keywords: ['menu', 'nav', 'bar', 'style', 'position'] },
           { id: 'clock', label: '时钟显示', keywords: ['clock', 'seconds', 'time'] },
           { id: 'bookmark-size', label: '书签图标', keywords: ['icon', 'size', 'bookmark'] },
         ]
@@ -244,6 +260,45 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                       </div>
                     </div>
                   </section>
+                  
+                  <section>
+                    <h4 className="text-sm font-medium text-blue-400 mb-4 uppercase tracking-wider">生日设置</h4>
+                    <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-white text-sm font-medium">我的生日</div>
+                          <div className="text-zinc-500 text-xs mt-0.5">
+                              {birthday && birthday !== 'skip' ? `当前设置: ${birthday} (每年自动为您庆祝)` : '尚未设置生日'}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {birthday && birthday !== 'skip' && onPreviewBirthday && (
+                            <button 
+                              onClick={() => { onClose(); setTimeout(onPreviewBirthday, 100); }}
+                              className="px-3 py-1.5 bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 text-xs rounded-lg transition-colors border border-pink-500/20"
+                            >
+                              预览祝福
+                            </button>
+                          )}
+                          {birthday && birthday !== 'skip' ? (
+                            <button 
+                              onClick={() => { setBirthday('skip'); addToast({ type: 'success', message: '生日已重置' }); }}
+                              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded-lg transition-colors border border-red-500/20"
+                            >
+                              重置
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => { setBirthday(null); onClose(); }}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition-colors"
+                            >
+                              去设置
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               )}
 
@@ -251,6 +306,51 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
               {activeTab === 'appearance' && (
                 <div className="space-y-8 animate-in slide-in-from-right-4 duration-300 fade-in">
                    <section>
+                    <h4 className="text-sm font-medium text-blue-400 mb-4 uppercase tracking-wider">菜单栏设置</h4>
+                    <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                      {/* Position */}
+                      <div>
+                          <div className="text-white text-sm font-medium mb-2">位置布局</div>
+                          <div className="flex gap-2 bg-zinc-800 p-1 rounded-lg">
+                              {['top', 'bottom', 'floating'].map((pos) => (
+                                  <button
+                                      key={pos}
+                                      onClick={() => setNavBarConfig({ position: pos as any })}
+                                      className={`flex-1 py-1.5 rounded-md text-xs transition-all ${
+                                          navBarConfig.position === pos 
+                                              ? 'bg-blue-600 text-white shadow-sm' 
+                                              : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                                      }`}
+                                  >
+                                      {{ top: '顶部固定', bottom: '底部固定', floating: '悬浮拖拽' }[pos]}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                      
+                      {/* Style */}
+                      <div>
+                          <div className="text-white text-sm font-medium mb-2">视觉风格</div>
+                          <div className="flex gap-2 bg-zinc-800 p-1 rounded-lg">
+                              {['glass', 'solid', 'transparent'].map((style) => (
+                                  <button
+                                      key={style}
+                                      onClick={() => setNavBarConfig({ style: style as any })}
+                                      className={`flex-1 py-1.5 rounded-md text-xs transition-all ${
+                                          navBarConfig.style === style 
+                                              ? 'bg-blue-600 text-white shadow-sm' 
+                                              : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                                      }`}
+                                  >
+                                      {{ glass: '磨砂玻璃', solid: '纯色背景', transparent: '完全透明' }[style]}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section>
                     <h4 className="text-sm font-medium text-blue-400 mb-4 uppercase tracking-wider">时钟组件</h4>
                     <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl divide-y divide-zinc-800">
                       <div className="p-4 flex items-center justify-between">
