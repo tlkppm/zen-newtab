@@ -17,11 +17,20 @@ const AppIcon = () => (
 export const AboutPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('about');
   
-  const version = '1.0.6';
-  const buildDate = '2026-01-29';
+  const version = '1.0.7';
+  const buildDate = '2026-02-02';
   const repoUrl = 'https://github.com/tlkppm/zen-newtab';
 
   const changelog = [
+    {
+      version: '1.0.7',
+      date: '2026-02-02',
+      tag: `${repoUrl}/releases/tag/v1.0.7`,
+      changes: [
+        '修复日历节日期间不显示农历日期的问题',
+        '假期期间正确显示初二、初三等农历日期',
+      ]
+    },
     {
       version: '1.0.6',
       date: '2026-01-29',

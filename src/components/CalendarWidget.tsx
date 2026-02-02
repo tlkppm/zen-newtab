@@ -115,12 +115,12 @@ export const CalendarWidget = () => {
         const solarFestivals = solar.getFestivals();
         const lunarFestivals = lunar.getFestivals();
         const jieQi = lunar.getJieQi();
+        const lunarDay = lunar.getDayInChinese();
         
-        if (holiday) festival = holiday.getName();
-        else if (lunarFestivals.length > 0) festival = lunarFestivals[0];
+        if (lunarFestivals.length > 0) festival = lunarFestivals[0];
         else if (solarFestivals.length > 0) festival = solarFestivals[0];
         else if (jieQi) festival = jieQi;
-        else festival = lunar.getDayInChinese();
+        else festival = lunarDay;
         
         let label = festival;
         if (label === '初一') label = lunar.getMonthInChinese() + '月';
