@@ -8,6 +8,7 @@ interface UpdateInfo {
   releaseUrl: string;
   releaseNotes: string;
   publishedAt: string;
+  error?: string;
 }
 
 export const UpdateNotification = () => {
@@ -18,25 +19,37 @@ export const UpdateNotification = () => {
   useEffect(() => {
     const checkUpdate = async () => {
       const dismissedVersion = localStorage.getItem('zen-dismissed-update');
+      const currentVersion = '1.0.8';
       
       try {
         setChecking(true);
-        // @ts-ignore
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-          // @ts-ignore
-          chrome.runtime.sendMessage({ type: 'CHECK_UPDATE' }, (response: UpdateInfo) => {
-            setChecking(false);
-            if (response?.hasUpdate) {
-              if (dismissedVersion === response.latestVersion) {
-                return;
-              }
-              setUpdateInfo(response);
-            }
-          });
-        } else {
-          setChecking(false);
+        const res = await fetch('https://api.github.com/repos/tlkppm/zen-newtab/releases/latest');
+        const data = await res.json();
+        const latestVersion = data.tag_name?.replace('v', '') || currentVersion;
+        
+        const parts1 = latestVersion.split('.').map(Number);
+        const parts2 = currentVersion.split('.').map(Number);
+        let hasUpdate = false;
+        for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+          const p1 = parts1[i] || 0;
+          const p2 = parts2[i] || 0;
+          if (p1 > p2) { hasUpdate = true; break; }
+          if (p1 < p2) break;
         }
-      } catch {
+        
+        setChecking(false);
+        if (hasUpdate) {
+          if (dismissedVersion === latestVersion) return;
+          setUpdateInfo({
+            hasUpdate: true,
+            currentVersion,
+            latestVersion,
+            releaseUrl: data.html_url || '',
+            releaseNotes: data.body || '',
+            publishedAt: data.published_at || ''
+          });
+        }
+      } catch (err) {
         setChecking(false);
       }
     };

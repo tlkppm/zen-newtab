@@ -109,11 +109,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Check for updates
   if (request.type === 'CHECK_UPDATE') {
     const currentVersion = chrome.runtime.getManifest().version;
+    console.log('[BG] CHECK_UPDATE - Current version:', currentVersion);
     fetch('https://api.github.com/repos/tlkppm/zen-newtab/releases/latest')
-      .then(res => res.json())
+      .then(res => {
+        console.log('[BG] GitHub API response status:', res.status);
+        return res.json();
+      })
       .then(data => {
+        console.log('[BG] GitHub API data:', data);
         const latestVersion = data.tag_name?.replace('v', '') || currentVersion;
         const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+        console.log('[BG] Latest version:', latestVersion, 'Has update:', hasUpdate);
         sendResponse({
           hasUpdate,
           currentVersion,
@@ -123,11 +129,164 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           publishedAt: data.published_at || ''
         });
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[BG] CHECK_UPDATE error:', err);
         sendResponse({ hasUpdate: false, currentVersion, error: '检查更新失败' });
       });
     return true;
   }
+  
+  if (request.type === 'DEEPSEEK_CHAT') {
+    const { question, system } = request;
+    const url = 'https://yunzhiapi.cn/API/depsek3.2.php';
+    
+    const formData = new URLSearchParams();
+    formData.append('question', question);
+    formData.append('type', 'text');
+    if (system) {
+      formData.append('system', system);
+    }
+    
+    (async () => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData.toString()
+        });
+        const text = await res.text();
+        sendResponse({ success: true, data: { result: text } });
+      } catch (err) {
+        console.error('[BG] DEEPSEEK_CHAT error:', err);
+        sendResponse({ success: false, error: err.message || 'Request failed' });
+      }
+    })();
+    return true;
+  }
+
+  if (request.type === 'WEB_SEARCH') {
+    const query = request.query;
+    const encodedQuery = encodeURIComponent(query);
+    
+    fetch(`https://html.duckduckgo.com/html/?q=${encodedQuery}`, {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html',
+        'Accept-Language': 'zh-CN,zh;q=0.9'
+      }
+    })
+      .then(res => res.text())
+      .then(html => {
+        const results = [];
+        
+        const resultRegex = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g;
+        const snippetRegex = /<a[^>]*class="result__snippet"[^>]*>([^<]*(?:<[^>]*>[^<]*)*)<\/a>/g;
+        
+        const links = [];
+        let match;
+        while ((match = resultRegex.exec(html)) !== null && links.length < 5) {
+          let url = match[1];
+          if (url.startsWith('//duckduckgo.com/l/?')) {
+            const uddgMatch = url.match(/uddg=([^&]+)/);
+            if (uddgMatch) url = decodeURIComponent(uddgMatch[1]);
+          }
+          if (url.startsWith('http') && !url.includes('duckduckgo.com')) {
+            links.push({ url, title: match[2].trim() });
+          }
+        }
+        
+        const snippets = [];
+        while ((match = snippetRegex.exec(html)) !== null && snippets.length < 5) {
+          snippets.push(match[1].replace(/<[^>]+>/g, '').trim().slice(0, 150));
+        }
+        
+        for (let i = 0; i < links.length; i++) {
+          results.push({
+            title: links[i].title,
+            url: links[i].url,
+            snippet: snippets[i] || ''
+          });
+        }
+        
+        if (results.length === 0) {
+          results.push({
+            title: `未找到结果，请尝试其他关键词`,
+            url: `https://www.bing.com/search?q=${encodedQuery}`,
+            snippet: `搜索: ${query}`
+          });
+        }
+        
+        console.log('[BG] WEB_SEARCH results:', results);
+        sendResponse({ results });
+      })
+      .catch(err => {
+        console.error('[BG] WEB_SEARCH error:', err);
+        sendResponse({ 
+          results: [{
+            title: `搜索失败: ${query}`,
+            url: `https://www.bing.com/search?q=${encodedQuery}`,
+            snippet: `错误: ${err.message}`
+          }]
+        });
+      });
+    return true;
+  }
+
+  if (request.type === 'FETCH_URL') {
+    fetch(request.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+      },
+      mode: 'cors',
+      credentials: 'omit'
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
+      })
+      .then(html => {
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        const title = titleMatch ? titleMatch[1].trim().replace(/&[^;]+;/g, '') : '';
+        
+        const metaDesc = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+        const description = metaDesc ? metaDesc[1].trim() : '';
+        
+        let content = html
+          .replace(/<script[\s\S]*?<\/script>/gi, '')
+          .replace(/<style[\s\S]*?<\/style>/gi, '')
+          .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+          .replace(/<header[\s\S]*?<\/header>/gi, '')
+          .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+          .replace(/<aside[\s\S]*?<\/aside>/gi, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&[^;]+;/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 8000);
+        
+        sendResponse({ 
+          success: true, 
+          content: `标题: ${title}\n${description ? `描述: ${description}\n` : ''}\n内容:\n${content}` 
+        });
+      })
+      .catch(err => {
+        console.error('[BG] FETCH_URL error:', err);
+        sendResponse({ 
+          success: false, 
+          content: `无法获取 ${request.url} 的内容。\n错误: ${err.message}\n\n请直接访问链接查看。`,
+          error: err.message 
+        });
+      });
+    return true;
+  }
+  
+  return false;
 });
 
 // Version comparison helper

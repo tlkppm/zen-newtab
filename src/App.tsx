@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, Upload, Clock as ClockIcon, Book, History, Terminal, Puzzle, Move, RotateCcw, MonitorPlay, Eye, EyeOff, Scaling, Cloud, Quote as QuoteIcon, Calendar, Plus, Grid, Info, Home, Code, Search as SearchIcon, Star, CheckSquare, StickyNote, Timer, Music, CalendarDays, Menu } from 'lucide-react';
+import { Settings, Upload, Clock as ClockIcon, Book, History, Terminal, Puzzle, Move, RotateCcw, MonitorPlay, Eye, EyeOff, Scaling, Cloud, Quote as QuoteIcon, Calendar, Plus, Grid, Info, Home, Code, Search as SearchIcon, Star, CheckSquare, StickyNote, Timer, Music, CalendarDays, Menu, Sparkles, Bot, Hexagon } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { Background } from './components/Background';
 import { Clock, DateWidget } from './components/Clock';
@@ -30,9 +30,10 @@ import { useToastStore } from './store/useToastStore';
 import { SettingsModal } from './components/SettingsModal';
 import { BirthdaySetupModal } from './components/BirthdaySetupModal';
 import { BirthdayGreeting } from './components/BirthdayGreeting';
+import { AIChat } from './components/AIChat';
 import dayjs from 'dayjs';
 
-type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions' | 'about';
+type ViewMode = 'home' | 'bookmarks' | 'history' | 'devtools' | 'extensions' | 'about' | 'ai-chat';
 
 // Alignment detection threshold in pixels
 const SNAP_THRESHOLD = 8;
@@ -267,6 +268,12 @@ function App() {
   
   // Initialize view mode based on settings
   useEffect(() => {
+    // Self-healing: Ensure clock is visible and has a valid position
+    if (!layout.clock || !layout.clock.visible) {
+        // Force reset clock visibility and position if missing
+        updateLayout('clock', { visible: true, x: 0, y: -100, w: 600, h: 200 });
+    }
+
     if (showBookmarksOnStartup) {
       setViewMode('bookmarks');
     }
@@ -410,6 +417,7 @@ function App() {
   const [isPhotoGridOpen, setIsPhotoGridOpen] = useState(false);
   const [isWidgetEditorOpen, setIsWidgetEditorOpen] = useState(false);
   const [clipboardShareCode, setClipboardShareCode] = useState<string | null>(null);
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
   useEffect(() => {
     const extractShareCode = (text: string): string | null => {
@@ -740,6 +748,14 @@ function App() {
                       <Puzzle size={20} />
                   </button>
                   <button 
+                    onClick={() => setViewMode('ai-chat')}
+                    className={`p-2 rounded-full transition-all ${viewMode === 'ai-chat' ? 'bg-white text-black shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+                    title="Trae 助手"
+                    data-ai-entry
+                  >
+                      <Bot size={20} />
+                  </button>
+                  <button 
                     onClick={() => setViewMode('about')}
                     className={`p-2 rounded-full transition-all ${viewMode === 'about' ? 'bg-white text-black shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
                     title="关于"
@@ -749,16 +765,6 @@ function App() {
               </div>
           </div>
       </nav>
-
-      <BirthdaySetupModal />
-      
-      {/* Birthday Greeting */}
-      {showBirthdayGreeting && (
-        <BirthdayGreeting onDismiss={() => {
-            setShowBirthdayGreeting(false);
-            setLastGreetingDate(dayjs().format('YYYY-MM-DD'));
-        }} />
-      )}
 
       {/* Context Menu */}
       {contextMenu && (
@@ -865,7 +871,7 @@ function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center justify-center relative z-10 w-full h-full">
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 md:p-8 transition-all duration-500 overflow-hidden">
         
         {/* Home View */}
         <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 transform ${viewMode === 'home' ? 'opacity-100 visible' : 'opacity-0 pointer-events-none invisible'}`}>
@@ -1230,33 +1236,10 @@ function App() {
             isOpen={isPhotoGridOpen}
             onClose={() => setIsPhotoGridOpen(false)}
             onSave={(newTiles, rows, cols) => {
-                // Add all tiles at once. 
-                // We should probably position them in a grid initially if possible, or just let them stack?
-                // The current addTile implementation stacks them at (0,0).
-                // Let's modify addTile to support batch add or just loop.
-                // But if we loop, they all go to 0,0.
-                // Better to manually position them here?
-                // The `addTile` function in store sets x:0, y:0.
-                // We can update their layout after adding.
-                
-                // However, `addTile` generates a new layout entry.
-                // We might want to enhance `useStore` to support `addTiles` (plural) with positions.
-                // Or just loop and update layout immediately.
-                
                 newTiles.forEach((tile, index) => {
                     addTile(tile);
-                    // Calculate initial grid position
-                    // We need the ID generated/used.
-                    // The tile object passed to addTile already has an ID.
-                    
                     const row = Math.floor(index / cols);
                     const col = index % cols;
-                    
-                    // Delay slightly to ensure state update? 
-                    // Zustand is synchronous usually.
-                    // Let's update layout.
-                    // Default size is 100x100.
-                    // Let's position them side by side.
                     const tileSize = 120; // slightly larger
                     const startX = -((cols * tileSize) / 2) + (tileSize / 2);
                     const startY = -((rows * tileSize) / 2) + (tileSize / 2);
@@ -1264,12 +1247,6 @@ function App() {
                     const x = startX + (col * tileSize);
                     const y = startY + (row * tileSize);
                     
-                    // We need to call updateLayout for this specific tile.
-                    // But `addTile` creates the layout entry with default 0,0.
-                    // We can override it.
-                    // setTimeout is not ideal but ensures the first set finished? 
-                    // No, Zustand batching might require it.
-                    // Actually, let's just use a timeout of 0.
                     setTimeout(() => {
                         // @ts-ignore
                         updateLayout(`tile_${tile.id}`, { x, y, w: tileSize, h: tileSize });
@@ -1284,14 +1261,14 @@ function App() {
         )}
 
         {/* Bookmarks View */}
-        <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'bookmarks' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+        <div className={`absolute inset-0 flex flex-col items-center pt-36 pb-10 transition-all duration-500 transform ${viewMode === 'bookmarks' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
              <div className="w-full max-w-6xl h-full overflow-y-auto custom-scrollbar px-4">
                  <Bookmarks />
              </div>
         </div>
 
         {/* History View */}
-        <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'history' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+        <div className={`absolute inset-0 flex flex-col items-center pt-36 pb-10 transition-all duration-500 transform ${viewMode === 'history' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
              <div className="w-full max-w-4xl h-full bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl overflow-hidden">
                  <div className="flex items-center gap-2 mb-6 text-white/80 border-b border-white/10 pb-4">
                      <History size={24} />
@@ -1302,7 +1279,7 @@ function App() {
         </div>
 
         {/* DevTools View */}
-        <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'devtools' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+        <div className={`absolute inset-0 flex flex-col items-center pt-36 pb-10 transition-all duration-500 transform ${viewMode === 'devtools' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
              <div className="w-full max-w-5xl h-full bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl overflow-hidden flex flex-col">
                  <div className="flex items-center gap-2 mb-4 text-white/80 border-b border-white/10 pb-4">
                      <Terminal size={24} />
@@ -1315,17 +1292,22 @@ function App() {
         </div>
 
         {/* Extensions View */}
-        <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'extensions' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+        <div className={`absolute inset-0 flex flex-col items-center pt-36 pb-10 transition-all duration-500 transform ${viewMode === 'extensions' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
              <div className="w-full max-w-6xl h-full bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl overflow-hidden">
                  <ExtensionsViewer />
              </div>
         </div>
 
         {/* About View */}
-        <div className={`absolute inset-0 flex flex-col items-center pt-24 pb-10 transition-all duration-500 transform ${viewMode === 'about' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+        <div className={`absolute inset-0 flex flex-col items-center pt-36 pb-10 transition-all duration-500 transform ${viewMode === 'about' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
              <div className="w-full max-w-4xl h-full bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl overflow-hidden">
                  <AboutPage />
              </div>
+        </div>
+
+        {/* AI Chat View */}
+        <div className={`absolute inset-0 flex flex-col items-center pt-36 pb-10 transition-all duration-500 transform ${viewMode === 'ai-chat' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+             <AIChat />
         </div>
 
       </main>

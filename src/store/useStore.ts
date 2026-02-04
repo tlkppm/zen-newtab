@@ -121,6 +121,18 @@ interface AppState {
   setLastGreetingDate: (date: string | null) => void;
   preBirthdayBackground: { image: string; source: 'url' | 'local' } | null;
   setPreBirthdayBackground: (bg: { image: string; source: 'url' | 'local' } | null) => void;
+
+  // AI API Configuration
+  aiConfig: {
+    apiEndpoint: string;
+    apiKey: string;
+    useCustomApi: boolean;
+    model: string;
+    temperature: number;
+    systemPrompt: string;
+    maxTokens: number;
+  };
+  setAiConfig: (config: Partial<AppState['aiConfig']>) => void;
 }
 
 const DEFAULT_LAYOUT = {
@@ -272,6 +284,17 @@ export const useStore = create<AppState>()(
       preBirthdayBackground: null,
       setPreBirthdayBackground: (bg) => set({ preBirthdayBackground: bg }),
 
+      aiConfig: {
+        apiEndpoint: 'https://yunzhiapi.cn/API/depsek3.2.php',
+        apiKey: '',
+        useCustomApi: false,
+        model: 'deepseek-chat',
+        temperature: 0.7,
+        systemPrompt: '',
+        maxTokens: 2000,
+      },
+      setAiConfig: (config) => set((state) => ({ aiConfig: { ...state.aiConfig, ...config } })),
+
       updateCustomWidget: (id, updates) => set((state) => ({
           customWidgets: state.customWidgets.map(w => 
               w.id === id ? { ...w, ...updates, updatedAt: Date.now() } : w
@@ -413,7 +436,8 @@ export const useStore = create<AppState>()(
         navBarConfig: state.navBarConfig,
         birthday: state.birthday,
         lastGreetingDate: state.lastGreetingDate,
-        generatedBirthdayImage: state.generatedBirthdayImage
+        generatedBirthdayImage: state.generatedBirthdayImage,
+        aiConfig: state.aiConfig
       }),
     }
   )

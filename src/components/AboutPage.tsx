@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Github, ExternalLink, ChevronRight, Shield, FileText, Scale, Package, History, AlertCircle, Tag } from 'lucide-react';
+import { Github, ExternalLink, ChevronRight, Shield, FileText, Scale, Package, History, AlertCircle, Tag, RefreshCw, Sparkles } from 'lucide-react';
 
 type TabType = 'about' | 'changelog' | 'licenses' | 'privacy';
 
@@ -14,14 +14,39 @@ const AppIcon = () => (
   </svg>
 );
 
+interface UpdateInfo {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseUrl: string;
+  releaseNotes?: string;
+  publishedAt?: string;
+  error?: string;
+}
+
 export const AboutPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('about');
+  const [checking, setChecking] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   
-  const version = '1.0.7';
-  const buildDate = '2026-02-02';
+  const version = '1.0.8';
+  const buildDate = '2026-02-05';
   const repoUrl = 'https://github.com/tlkppm/zen-newtab';
 
   const changelog = [
+    {
+      version: '1.0.8',
+      date: '2026-02-05',
+      tag: `${repoUrl}/releases/tag/v1.0.8`,
+      changes: [
+        '新增 AI 工具调用系统，支持联网搜索和网页内容获取',
+        'AI 对话实时显示工具执行状态和结果',
+        'AI 现在知道当前日期时间，搜索更准确',
+        '支持用户自定义系统提示词',
+        '改进消息气泡布局，解决内容溢出问题',
+        '优化工具调用提示，防止无限循环',
+      ]
+    },
     {
       version: '1.0.7',
       date: '2026-02-02',
@@ -181,6 +206,57 @@ export const AboutPage = () => {
                   <span>Manifest V3</span>
                   <span>Chrome / Edge</span>
                 </div>
+                <button
+                  onClick={async () => {
+                    setChecking(true);
+                    setUpdateInfo(null);
+                    try {
+                      const res = await fetch('https://api.github.com/repos/tlkppm/zen-newtab/releases/latest');
+                      const data = await res.json();
+                      const latestVersion = data.tag_name?.replace('v', '') || version;
+                      const parts1 = latestVersion.split('.').map(Number);
+                      const parts2 = version.split('.').map(Number);
+                      let hasUpdate = false;
+                      for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+                        const p1 = parts1[i] || 0;
+                        const p2 = parts2[i] || 0;
+                        if (p1 > p2) { hasUpdate = true; break; }
+                        if (p1 < p2) break;
+                      }
+                      setUpdateInfo({
+                        hasUpdate,
+                        currentVersion: version,
+                        latestVersion,
+                        releaseUrl: data.html_url || '',
+                        releaseNotes: data.body || '',
+                        publishedAt: data.published_at || ''
+                      });
+                    } catch (err) {
+                      setUpdateInfo({ hasUpdate: false, currentVersion: version, latestVersion: version, releaseUrl: '', error: '检查更新失败' });
+                    }
+                    setChecking(false);
+                  }}
+                  disabled={checking}
+                  className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 text-white text-xs rounded-lg transition-colors"
+                >
+                  <RefreshCw size={14} className={checking ? 'animate-spin' : ''} />
+                  {checking ? '检查中...' : '检查更新'}
+                </button>
+                {updateInfo && (
+                  <div className={`mt-2 p-2 rounded-lg text-xs ${updateInfo.hasUpdate ? 'bg-green-500/10 border border-green-500/20' : 'bg-zinc-800/50 border border-zinc-700'}`}>
+                    {updateInfo.error ? (
+                      <span className="text-red-400">检查失败: {updateInfo.error}</span>
+                    ) : updateInfo.hasUpdate ? (
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={14} className="text-green-400" />
+                        <span className="text-green-400">发现新版本: v{updateInfo.latestVersion}</span>
+                        <a href={updateInfo.releaseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline ml-2">查看</a>
+                      </div>
+                    ) : (
+                      <span className="text-zinc-400">已是最新版本 (v{updateInfo.currentVersion})</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

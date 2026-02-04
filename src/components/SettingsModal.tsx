@@ -3,7 +3,7 @@ import {
   X, Search, Monitor, Image as ImageIcon, Video, Upload, 
   Link, Clock, Layout, Share2, Download, UploadCloud,
   Palette, Smartphone, MousePointer2, Keyboard, Zap,
-  Menu, ChevronRight
+  Menu, ChevronRight, Bot, Key, Globe
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { saveImageToDB, saveVideoToDB, clearVideoFromDB, getImageFromDB, getVideoFromDB } from '../lib/db';
@@ -15,7 +15,7 @@ interface SettingsModalProps {
   onPreviewBirthday?: () => void;
 }
 
-type SettingsTab = 'general' | 'appearance' | 'background' | 'data';
+type SettingsTab = 'general' | 'appearance' | 'background' | 'data' | 'ai';
 
 export const SettingsModal = ({ isOpen, onClose, onPreviewBirthday }: SettingsModalProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -32,7 +32,8 @@ export const SettingsModal = ({ isOpen, onClose, onPreviewBirthday }: SettingsMo
     backgroundImageSource,
     applyLocalImage, applyVideo,
     exportLayout, importLayout,
-    setBackgroundImage
+    setBackgroundImage,
+    aiConfig, setAiConfig
   } = useStore();
 
   const { addToast } = useToastStore();
@@ -93,6 +94,15 @@ export const SettingsModal = ({ isOpen, onClose, onPreviewBirthday }: SettingsMo
         items: [
           { id: 'export', label: '导出布局', keywords: ['export', 'share', 'backup'] },
           { id: 'import', label: '导入布局', keywords: ['import', 'restore'] },
+        ]
+      },
+      {
+        id: 'ai',
+        icon: <Bot size={18} />,
+        label: 'AI 设置',
+        items: [
+          { id: 'api-endpoint', label: 'API 端点', keywords: ['api', 'endpoint', 'url', 'deepseek'] },
+          { id: 'api-key', label: 'API 密钥', keywords: ['key', 'token', 'auth'] },
         ]
       }
     ];
@@ -599,6 +609,121 @@ export const SettingsModal = ({ isOpen, onClose, onPreviewBirthday }: SettingsMo
                           >
                             应用
                           </button>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              )}
+
+              {/* AI Tab */}
+              {activeTab === 'ai' && (
+                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300 fade-in">
+                  <section className="bg-zinc-800/30 border border-zinc-800 rounded-xl p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-blue-500/10 rounded-xl">
+                        <Bot className="text-blue-400" size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-base font-medium text-white mb-1">AI API 配置</h4>
+                        <p className="text-sm text-zinc-400 mb-4">配置自定义 API 端点和密钥，使用您自己的 AI 服务。</p>
+                        
+                        <div className="space-y-4">
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={aiConfig.useCustomApi}
+                              onChange={(e) => setAiConfig({ useCustomApi: e.target.checked })}
+                              className="w-4 h-4 rounded bg-zinc-700 border-zinc-600 text-blue-500 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-zinc-300">使用自定义 API</span>
+                          </label>
+
+                          <div className={`space-y-4 ${!aiConfig.useCustomApi ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div>
+                              <label className="block text-xs text-zinc-400 mb-2">
+                                <Globe size={12} className="inline mr-1" />
+                                API 端点
+                              </label>
+                              <input
+                                type="text"
+                                value={aiConfig.apiEndpoint}
+                                onChange={(e) => setAiConfig({ apiEndpoint: e.target.value })}
+                                placeholder="https://api.example.com/v1/chat"
+                                className="w-full bg-zinc-900 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-zinc-400 mb-2">
+                                <Key size={12} className="inline mr-1" />
+                                API 密钥
+                              </label>
+                              <input
+                                type="password"
+                                value={aiConfig.apiKey}
+                                onChange={(e) => setAiConfig({ apiKey: e.target.value })}
+                                placeholder="sk-..."
+                                className="w-full bg-zinc-900 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none text-sm"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs text-zinc-400 mb-2">模型名称</label>
+                                <input
+                                  type="text"
+                                  value={aiConfig.model || 'deepseek-chat'}
+                                  onChange={(e) => setAiConfig({ model: e.target.value })}
+                                  placeholder="deepseek-chat"
+                                  className="w-full bg-zinc-900 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-zinc-400 mb-2">最大 Token</label>
+                                <input
+                                  type="number"
+                                  value={aiConfig.maxTokens || 2000}
+                                  onChange={(e) => setAiConfig({ maxTokens: parseInt(e.target.value) || 2000 })}
+                                  className="w-full bg-zinc-900 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none text-sm"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-zinc-400 mb-2">温度 (Temperature): {aiConfig.temperature || 0.7}</label>
+                                <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="2" 
+                                    step="0.1"
+                                    value={aiConfig.temperature || 0.7}
+                                    onChange={(e) => setAiConfig({ temperature: parseFloat(e.target.value) })}
+                                    className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                                <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
+                                    <span>精确 (0.0)</span>
+                                    <span>平衡 (0.7)</span>
+                                    <span>创造性 (2.0)</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-zinc-400 mb-2">系统预设提示词</label>
+                                <textarea 
+                                    value={aiConfig.systemPrompt || ''}
+                                    onChange={(e) => setAiConfig({ systemPrompt: e.target.value })}
+                                    placeholder="例如：你是一个专业的程序员助手..."
+                                    className="w-full bg-zinc-900 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none text-sm min-h-[100px] resize-none"
+                                />
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-zinc-500">
+                            {aiConfig.useCustomApi 
+                              ? '使用自定义 API 时，请确保端点兼容 OpenAI 格式或 DeepSeek 格式。' 
+                              : '当前使用默认的免费 DeepSeek API 服务。'}
+                          </p>
                         </div>
                       </div>
                     </div>
